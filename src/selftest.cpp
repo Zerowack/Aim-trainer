@@ -143,6 +143,18 @@ bool RunSelfTest(std::string& report) {
         c.True("crosshair code round trip", ok && y.r == 255 && y.b == 128 && y.centerDot && y.innerLength == 9 &&
                                                 y.innerOffset == 0 && y.outerShow);
         c.True("crosshair code rejects garbage", !DecodeCrosshair("hello world", y, &err));
+
+        // Valorant share codes.
+        Crosshair v;
+        const bool vok = DecodeAnyCrosshair("0;P;c;5;h;0;f;0;0l;4;0o;2;0a;1;0f;0;1b;0", v, &err);
+        c.True("valorant code: cyan, no outline, 4/2 inner, no outer",
+               vok && v.r == 0 && v.g == 255 && v.b == 255 && !v.outline && v.innerLength == 4 && v.innerOffset == 2 &&
+                   v.innerOpacity > 0.99f && !v.outerShow);
+        const bool vok2 = DecodeAnyCrosshair("0;s;1;P;c;8;u;FF8000FF;d;1;z;3;0t;1;A;c;1;0l;10", v, &err);
+        c.True("valorant code: custom colour, dot, ADS section ignored",
+               vok2 && v.r == 255 && v.g == 128 && v.b == 0 && v.centerDot && v.dotThickness == 3 && v.innerThickness == 1 &&
+                   v.innerLength == 6 && v.outerShow);
+        c.True("valorant code rejects missing P section", !DecodeValorantCrosshair("0;A;c;1", v, &err));
     }
 
     char summary[96];

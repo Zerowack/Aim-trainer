@@ -66,7 +66,9 @@ bool Swatch(Rectangle r, Color c, bool selected);
 // Word-wrapped paragraph. Returns the height used.
 float TextBlock(const std::string& s, float x, float y, float width, float size, Color c);
 bool Stepper(Rectangle r, const std::string& label, int* index, const char* const* items, int count);
-// Single-line text box (click to focus, type, Ctrl+V pastes, Enter unfocuses).
+// Single-line text box. Clicking into it selects everything, so typing or
+// Ctrl+V replaces the old value; Ctrl+A selects all, Ctrl+Backspace clears,
+// Enter unfocuses.
 // Returns true whenever the text changed. 'id' must be unique on screen.
 bool TextBox(Rectangle r, int id, std::string* text, size_t maxLen, bool numeric);
 bool AnyTextBoxFocused();

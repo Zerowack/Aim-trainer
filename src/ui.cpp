@@ -29,6 +29,7 @@ float g_vw = 1600.0f;
 float g_vh = 1080.0f;
 
 int g_focusedBox = -1;          // TextBox id with keyboard focus
+bool g_selectAll = false;       // focused box has "everything selected"
 const void* g_activeSlider = nullptr;
 
 constexpr float kBaseW = 1600.0f;
@@ -334,31 +335,55 @@ bool TextBox(Rectangle r, int id, std::string* text, size_t maxLen, bool numeric
     bool changed = false;
 
     if (LeftPressed()) {
-        if (hover) g_focusedBox = id;
-        else if (g_focusedBox == id) g_focusedBox = -1;
+        if (hover && g_focusedBox != id) {
+            // Clicking into a box selects all of it, so typing or pasting
+            // replaces the old value (like most text fields).
+            g_focusedBox = id;
+            g_selectAll = !text->empty();
+        } else if (!hover && g_focusedBox == id) {
+            g_focusedBox = -1;
+        }
     }
 
     auto accept = [numeric](int& c) {
         if (numeric && c == ',') c = '.';
         return numeric ? ((c >= '0' && c <= '9') || c == '.') : (c >= 32 && c < 127);
     };
+    // First edit while everything is selected replaces the whole text.
+    auto replaceSelection = [&]() {
+        if (g_selectAll) {
+            text->clear();
+            g_selectAll = false;
+            changed = true;
+        }
+    };
 
     const bool focused = g_focusedBox == id;
     if (focused) {
+        const bool ctrl = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
         int ch = GetCharPressed();
         while (ch > 0) {
-            if (accept(ch) && text->size() < maxLen) {
-                text->push_back(static_cast<char>(ch));
-                changed = true;
+            if (accept(ch)) {
+                replaceSelection();
+                if (text->size() < maxLen) {
+                    text->push_back(static_cast<char>(ch));
+                    changed = true;
+                }
             }
             ch = GetCharPressed();
         }
-        if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) && !text->empty()) {
-            text->pop_back();
-            changed = true;
+        if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE) || IsKeyPressed(KEY_DELETE)) {
+            if (g_selectAll || ctrl) {
+                g_selectAll = true;  // Ctrl+Backspace clears everything
+                replaceSelection();
+            } else if (!text->empty()) {
+                text->pop_back();
+                changed = true;
+            }
         }
-        const bool ctrl = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+        if (ctrl && IsKeyPressed(KEY_A)) g_selectAll = !text->empty();
         if (ctrl && IsKeyPressed(KEY_V)) {
+            replaceSelection();
             const char* clip = GetClipboardText();
             for (const char* p = clip; p && *p && text->size() < maxLen; ++p) {
                 int c = static_cast<unsigned char>(*p);
@@ -367,6 +392,9 @@ bool TextBox(Rectangle r, int id, std::string* text, size_t maxLen, bool numeric
                     changed = true;
                 }
             }
+        }
+        if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_END) || IsKeyPressed(KEY_HOME)) {
+            g_selectAll = false;
         }
         if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER)) g_focusedBox = -1;
     }
@@ -377,8 +405,11 @@ bool TextBox(Rectangle r, int id, std::string* text, size_t maxLen, bool numeric
     // Show the end of long strings.
     std::string shown = *text;
     while (!shown.empty() && TextWidth(shown, size) > r.width - 24.0f) shown.erase(0, 1);
+    if (focused && g_selectAll && !shown.empty()) {
+        Fill(Rectangle{r.x + 8.0f, r.y + 8.0f, TextWidth(shown, size) + 4.0f, r.height - 16.0f}, Alpha(theme::kAccent, 0.45f));
+    }
     Text(shown, r.x + 10.0f, r.y + (r.height - size) * 0.5f, size, theme::kText);
-    if (focused && std::fmod(GetTime(), 1.0) < 0.55) {
+    if (focused && !g_selectAll && std::fmod(GetTime(), 1.0) < 0.55) {
         const float cx = r.x + 12.0f + TextWidth(shown, size);
         Fill(Rectangle{cx, r.y + 8.0f, 2.0f, r.height - 16.0f}, theme::kText);
     }
@@ -389,6 +420,7 @@ bool AnyTextBoxFocused() { return g_focusedBox >= 0; }
 
 void ClearFocus() {
     g_focusedBox = -1;
+    g_selectAll = false;
 }
 
 void StatTile(Rectangle r, const std::string& title, const std::string& value, Color accent) {

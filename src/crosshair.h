@@ -38,6 +38,17 @@ void ClampCrosshair(Crosshair& c);
 std::string EncodeCrosshair(const Crosshair& c);
 bool DecodeCrosshair(const std::string& code, Crosshair& out, std::string* error);
 
+// Valorant in-game share code (Settings > Crosshair > Import/Export), e.g.
+//   0;P;c;5;h;0;f;0;0l;4;0o;2;0a;1;0f;0;1b;0
+// Only the primary crosshair ("P" section) is used. Settings this trainer
+// has no equivalent for (firing/movement error, separate vertical length,
+// ADS and sniper crosshairs) are ignored.
+bool DecodeValorantCrosshair(const std::string& code, Crosshair& out, std::string* error);
+
+// Accepts either format: tries the Valorant code first when it looks like
+// one (starts with "0;"), otherwise the XH1 format.
+bool DecodeAnyCrosshair(const std::string& code, Crosshair& out, std::string* error);
+
 // Draws the crosshair centred on pixel (cx, cy). 'scale' enlarges it for the
 // editor preview (1 = real size).
 void DrawCrosshair(const Crosshair& c, int cx, int cy, int scale = 1);

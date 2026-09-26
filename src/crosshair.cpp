@@ -168,6 +168,110 @@ bool DecodeCrosshair(const std::string& codeIn, Crosshair& out, std::string* err
     return true;
 }
 
+bool DecodeValorantCrosshair(const std::string& codeIn, Crosshair& out, std::string* error) {
+    auto fail = [&](const std::string& msg) {
+        if (error) *error = msg;
+        return false;
+    };
+    const std::string code = Trim(codeIn);
+
+    // Split on ';' (ignoring stray spaces / line breaks from copy-paste).
+    std::vector<std::string> tok;
+    size_t pos = 0;
+    while (pos <= code.size()) {
+        size_t next = code.find(';', pos);
+        if (next == std::string::npos) next = code.size();
+        tok.push_back(Trim(code.substr(pos, next - pos)));
+        pos = next + 1;
+    }
+    while (!tok.empty() && tok.back().empty()) tok.pop_back();
+    if (tok.empty() || tok[0] != "0") return fail("Not a Valorant crosshair code (it should start with \"0;\").");
+
+    // Valorant's defaults: every code only lists values that differ from these.
+    Crosshair c;
+    c.r = 255; c.g = 255; c.b = 255;
+    c.outline = true; c.outlineThickness = 1; c.outlineOpacity = 0.5f;
+    c.centerDot = false; c.dotThickness = 2; c.dotOpacity = 1.0f;
+    c.innerShow = true; c.innerOpacity = 0.8f; c.innerLength = 6; c.innerThickness = 2; c.innerOffset = 3;
+    c.outerShow = true; c.outerOpacity = 0.35f; c.outerLength = 2; c.outerThickness = 2; c.outerOffset = 10;
+
+    // Valorant's colour presets (c;0..7); c;8 = custom colour from "u".
+    static const unsigned char kPresets[8][3] = {{255, 255, 255}, {0, 255, 0},   {127, 255, 0}, {223, 255, 0},
+                                                 {255, 255, 0},   {0, 255, 255}, {255, 0, 255}, {255, 0, 0}};
+    int colorIndex = 0;
+    std::string customHex;
+
+    std::string section;  // "" = general, "P" primary, "A" ADS, "S" sniper
+    bool sawPrimary = false;
+    size_t i = 1;
+    while (i < tok.size()) {
+        const std::string& t = tok[i];
+        if (t == "P" || t == "A" || t == "S") {
+            section = t;
+            if (t == "P") sawPrimary = true;
+            ++i;
+            continue;
+        }
+        if (i + 1 >= tok.size()) break;  // key without value: ignore the tail
+        const std::string key = t;
+        const std::string val = Lower(tok[i + 1]);
+        i += 2;
+        if (section != "P") continue;
+
+        int iv = 0;
+        float fv = 0.0f;
+        bool bv = false;
+        bool ok = true;
+        if (key == "c") { ok = ParseInt(val, colorIndex); }
+        else if (key == "u") { customHex = val; }
+        else if (key == "h") { ok = ParseBool(val, bv); c.outline = bv; }
+        else if (key == "t") { ok = ParseInt(val, iv); c.outlineThickness = iv; }
+        else if (key == "o") { ok = ParseFloat(val, fv); c.outlineOpacity = fv; }
+        else if (key == "d") { ok = ParseBool(val, bv); c.centerDot = bv; }
+        else if (key == "z") { ok = ParseInt(val, iv); c.dotThickness = iv; }
+        else if (key == "a") { ok = ParseFloat(val, fv); c.dotOpacity = fv; }
+        else if (key == "0b") { ok = ParseBool(val, bv); c.innerShow = bv; }
+        else if (key == "0t") { ok = ParseInt(val, iv); c.innerThickness = iv; }
+        else if (key == "0l") { ok = ParseInt(val, iv); c.innerLength = iv; }
+        else if (key == "0o") { ok = ParseInt(val, iv); c.innerOffset = iv; }
+        else if (key == "0a") { ok = ParseFloat(val, fv); c.innerOpacity = fv; }
+        else if (key == "1b") { ok = ParseBool(val, bv); c.outerShow = bv; }
+        else if (key == "1t") { ok = ParseInt(val, iv); c.outerThickness = iv; }
+        else if (key == "1l") { ok = ParseInt(val, iv); c.outerLength = iv; }
+        else if (key == "1o") { ok = ParseInt(val, iv); c.outerOffset = iv; }
+        else if (key == "1a") { ok = ParseFloat(val, fv); c.outerOpacity = fv; }
+        // Anything else (firing/movement error, vertical length, ...) has no
+        // equivalent here and is skipped.
+        if (!ok) return fail("Bad value '" + val + "' for '" + key + "'.");
+    }
+    if (!sawPrimary && tok.size() > 1) return fail("No primary crosshair (\"P\") section in the code.");
+
+    if (colorIndex == 8 && customHex.size() >= 6) {
+        char* end = nullptr;
+        const std::string rgb = customHex.substr(0, 6);
+        const unsigned long v = std::strtoul(rgb.c_str(), &end, 16);
+        if (!end || *end != '\0') return fail("Bad custom colour '" + customHex + "'.");
+        c.r = static_cast<unsigned char>((v >> 16) & 0xFF);
+        c.g = static_cast<unsigned char>((v >> 8) & 0xFF);
+        c.b = static_cast<unsigned char>(v & 0xFF);
+    } else if (colorIndex >= 0 && colorIndex < 8) {
+        c.r = kPresets[colorIndex][0];
+        c.g = kPresets[colorIndex][1];
+        c.b = kPresets[colorIndex][2];
+    }
+
+    ClampCrosshair(c);
+    out = c;
+    if (error) error->clear();
+    return true;
+}
+
+bool DecodeAnyCrosshair(const std::string& code, Crosshair& out, std::string* error) {
+    const std::string t = Trim(code);
+    if (t.rfind("0;", 0) == 0 || t == "0") return DecodeValorantCrosshair(t, out, error);
+    return DecodeCrosshair(t, out, error);
+}
+
 void DrawCrosshair(const Crosshair& cIn, int cx, int cy, int scale) {
     Crosshair c = cIn;
     ClampCrosshair(c);

@@ -441,17 +441,20 @@ void App::SettingsCrosshair(float x, float y, float /*w*/) {
     }
 
     float sy = y + 460.0f;
-    Text("CROSSHAIR CODE (paste one and press IMPORT)", x3, sy, 18.0f, theme::kTextDim);
-    TextBox(Rectangle{x3, sy + 26.0f, pw, 48.0f}, 20, &xhCodeText_, 240, false);
+    Text("CROSSHAIR CODE (Valorant share code or XH1 code, then IMPORT)", x3, sy, 18.0f, theme::kTextDim);
+    TextBox(Rectangle{x3, sy + 26.0f, pw, 48.0f}, 20, &xhCodeText_, 1000, false);
     sy += 90.0f;
     const float bw = (pw - 20.0f) / 3.0f;
     if (Button(Rectangle{x3, sy, bw, 48.0f}, "IMPORT", true)) {
         Crosshair parsed;
         std::string err;
-        if (DecodeCrosshair(xhCodeText_, parsed, &err)) {
+        const bool fromValorant = xhCodeText_.find(';') != std::string::npos &&
+                                  xhCodeText_.find_first_not_of(" \t") == xhCodeText_.find("0;");
+        if (DecodeAnyCrosshair(xhCodeText_, parsed, &err)) {
             c = parsed;
             xhCodeText_ = EncodeCrosshair(c);
-            xhMessage_ = "Imported.";
+            xhMessage_ = fromValorant ? "Imported your Valorant crosshair."
+                                      : "Imported.";
         } else {
             xhMessage_ = "Invalid code: " + err;
         }
@@ -473,7 +476,7 @@ void App::SettingsCrosshair(float x, float y, float /*w*/) {
     if (!xhMessage_.empty()) TextBlock(xhMessage_, x3, sy + 118.0f, pw, 18.0f, theme::kWarn);
     TextBlock("Format: XH1; c=RRGGBB colour; o/ot/oa = outline on, thickness, alpha; d/dt/da = center dot; "
               "i/ia/il/it/io = inner lines on, alpha, length, thickness, offset; x/xa/xl/xt/xo = outer lines.",
-              x3, sy + 150.0f, pw, 16.0f, Alpha(theme::kTextDim, 0.8f));
+              x3, sy + 175.0f, pw, 16.0f, Alpha(theme::kTextDim, 0.8f));
 }
 
 void App::SettingsAudio(float x, float y, float w) {

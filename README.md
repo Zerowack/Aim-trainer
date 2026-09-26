@@ -18,7 +18,7 @@ Valorant:
 - **Stats:** after each run you get score, accuracy, reaction time, time-to-kill (TTK), and your
   overshoot/undershoot tendency, plus a coaching tip (e.g. *"You overshoot flicks, try
   lowering sens ~5%"*). Per-mode progress graphs and personal bests are included.
-- **Crosshair editor:** Valorant-style, with a live preview and importable share codes. You can
+- **Crosshair editor:** Valorant-style, with a live preview. You can **paste your Valorant crosshair share code** to import it. You can
   also change target colour, map brightness, volume and keybinds.
 
 No Riot logos, fonts or assets are used. The UI uses the Windows system font
@@ -231,7 +231,16 @@ over/undershoot, average click error and coaching tips. Everything is appended t
 | `src/rng.h` | random numbers |
 | `src/selftest.h`, `src/selftest.cpp` | startup math self-test (Debug builds) |
 
-### Crosshair share code format
+### Importing your Valorant crosshair
+
+In Valorant open **Settings → Crosshair → Crosshair Profile → Export**. This copies
+a code like `0;P;c;5;h;0;f;0;0l;4;0o;2;0a;1;0f;0;1b;0`. In RawAim go to
+**Settings → Crosshair**, click **PASTE** (or click the code box and press Ctrl+V), then
+click **IMPORT**. RawAim imports the primary crosshair: colour (including custom
+colours), outlines, centre dot, and inner and outer lines. Valorant-only extras such as
+firing/movement error, separate vertical length, and the ADS and sniper crosshairs are ignored.
+
+### RawAim crosshair code format
 
 ```
 XH1;c=00FF00;o=1;ot=1;oa=0.50;d=0;dt=2;da=1.00;i=1;ia=0.80;il=6;it=2;io=3;x=0;xa=0.35;xl=2;xt=2;xo=10
