@@ -22,6 +22,15 @@ struct Keybinds {
     int pause;     // Esc always pauses too; this is an extra key
     int toggleFps;
     int scope;     // Sniper mode (default Mouse 2)
+    // Movement (VS Bot / Sniper).
+    int forward;
+    int back;
+    int left;
+    int right;
+    int walk;
+    int crouch;
+    int jump;
+    int reload;    // VS Bot
 };
 
 struct Config {

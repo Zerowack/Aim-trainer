@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "modes.h"
+#include "input.h"
 #include "movement.h"
 #include "rank.h"
 #include "rlgl.h"
@@ -497,8 +498,8 @@ private:
 
     // ---------------------------------------------------------------- player
     void UpdatePlayer(double t, float dt, bool live) {
-        StepPlayer(player_, ctx_.cam->Yaw(), live, 1.0f, dt, ctx_.world->Covers());
-        if (live && IsKeyPressed(KEY_R) && !gun_.reloading && gun_.ammo < kMagazine) StartReload(gun_, t);
+        StepPlayer(player_, ctx_.moveKeys, ctx_.cam->Yaw(), live, 1.0f, dt, ctx_.world->Covers());
+        if (live && input::BindPressed(ctx_.reloadBind) && !gun_.reloading && gun_.ammo < kMagazine) StartReload(gun_, t);
         ctx_.cam->SetEye(player_.Eye());
 
         if (gun_.reloading && t >= gun_.readyAt) {

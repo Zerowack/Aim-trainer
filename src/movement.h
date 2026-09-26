@@ -33,6 +33,17 @@ constexpr float kRadius = 0.35f;
 constexpr float kAccurateSpeed = 1.485f;  // at or below this the first shot is accurate (27.5% of run speed)
 constexpr float kFootstepSpeed = 3.2f;   // faster than walking = audible footsteps
 
+// Keys for the local player (bind codes, see input.h: keys or mouse buttons).
+struct MoveBinds {
+    int forward = KEY_W;
+    int back = KEY_S;
+    int left = KEY_A;
+    int right = KEY_D;
+    int walk = KEY_LEFT_SHIFT;
+    int crouch = KEY_LEFT_CONTROL;
+    int jump = KEY_SPACE;
+};
+
 // Something that walks around: feet position, velocity, crouch amount.
 struct Mover {
     Vector3 pos = {0.0f, 0.0f, 0.0f};
@@ -62,11 +73,12 @@ void Crouch(Mover& m, bool down, float dt);
 // integrate, gravity, collision. A crouched mover never exceeds crouch speed.
 void Step(Mover& m, float wishX, float wishZ, float wishSpeed, bool crouch, float dt, const std::vector<Box>& boxes);
 
-// The local player: reads WASD / Shift (walk) / Ctrl (crouch) / Space (jump)
-// relative to the camera yaw and steps the mover. 'speedMult' scales the
+// The local player: reads the movement binds (default WASD, Shift walk,
+// Ctrl crouch, Space jump) relative to the camera yaw and steps the mover. 'speedMult' scales the
 // maximum speed (heavy weapons, scoped movement). With live == false only
 // the crouch and stopping are simulated (freeze time).
-void StepPlayer(Mover& m, double yawDeg, bool live, float speedMult, float dt, const std::vector<Box>& boxes);
+void StepPlayer(Mover& m, const MoveBinds& keys, double yawDeg, bool live, float speedMult, float dt,
+                const std::vector<Box>& boxes);
 
 // Pushes the mover against the direction it is moving (a counter-strafe).
 void CounterStrafe(const Mover& m, float& wishX, float& wishZ, float& wishSpeed);

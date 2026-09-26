@@ -17,7 +17,7 @@
 #include "stats.h"
 #include "world.h"
 
-constexpr const char* kAppVersion = "2.0.1";
+constexpr const char* kAppVersion = "2.0.2";
 
 // Game clock = real time minus all time spent paused.
 struct GameClock {
@@ -190,6 +190,7 @@ private:
     double worstMsWindow_ = 0.0;
     double worstMsShown_ = 0.0;
     double nextFrameDeadline_ = 0.0;
+    int monitorHz_ = 60;             // cached, see ApplyDisplayMode()
 
     // --- misc
     bool selfTestRan_ = false;

@@ -809,15 +809,27 @@ void App::SettingsKeybinds(float x, float y, float w) {
         int* code;
         bool allowLeftMouse;
     };
+    // Left column: general. Right column: movement (VS Bot / Sniper).
     Row rows[] = {{"Shoot", &cfg_.keys.shoot, true},
                   {"Restart run", &cfg_.keys.restart, false},
                   {"Pause (Esc always pauses too)", &cfg_.keys.pause, false},
                   {"Toggle FPS counter", &cfg_.keys.toggleFps, false},
-                  {"Scope (Sniper mode)", &cfg_.keys.scope, false}};
-    const float cw = std::min(900.0f, w);
+                  {"Scope (Sniper)", &cfg_.keys.scope, false},
+                  {"Reload (VS Bot)", &cfg_.keys.reload, false},
+                  {"Move forward", &cfg_.keys.forward, false},
+                  {"Move back", &cfg_.keys.back, false},
+                  {"Move left", &cfg_.keys.left, false},
+                  {"Move right", &cfg_.keys.right, false},
+                  {"Walk (hold)", &cfg_.keys.walk, false},
+                  {"Crouch (hold)", &cfg_.keys.crouch, false},
+                  {"Jump", &cfg_.keys.jump, false}};
+    constexpr int kRows = static_cast<int>(sizeof(rows) / sizeof(rows[0]));
+    constexpr int kLeftRows = 6;
+    const float gap = 30.0f;
+    const float cw = (w - gap) * 0.5f;
 
     // Capture the next key/button (skipping the click that started capture).
-    if (rebinding_ >= 0 && frameCounter_ > rebindStartFrame_) {
+    if (rebinding_ >= 0 && rebinding_ < kRows && frameCounter_ > rebindStartFrame_) {
         const int code = input::CaptureBind();
         if (code == -1) {
             rebinding_ = -1;
@@ -833,21 +845,35 @@ void App::SettingsKeybinds(float x, float y, float w) {
         }
     }
 
-    for (int i = 0; i < 5; ++i) {
-        const float ry = y + static_cast<float>(i) * 72.0f;
-        Fill(Rectangle{x, ry, cw, 60.0f}, theme::kPanel);
-        Text(rows[i].name, x + 20.0f, ry + 18.0f, 22.0f, theme::kText);
-        const std::string label = rebinding_ == i ? "PRESS A KEY / BUTTON  (Esc cancels)" : input::BindName(*rows[i].code);
-        if (Button(Rectangle{x + cw - 420.0f, ry + 6.0f, 410.0f, 48.0f}, label, rebinding_ == i) && rebinding_ < 0) {
+    Text("GENERAL", x, y, 18.0f, theme::kAccent);
+    Text("MOVEMENT (VS BOT / SNIPER)", x + cw + gap, y, 18.0f, theme::kAccent);
+    for (int i = 0; i < kRows; ++i) {
+        const bool right = i >= kLeftRows;
+        const float rx = right ? x + cw + gap : x;
+        const float ry = y + 30.0f + static_cast<float>(right ? i - kLeftRows : i) * 62.0f;
+        Fill(Rectangle{rx, ry, cw, 54.0f}, theme::kPanel);
+        Text(rows[i].name, rx + 16.0f, ry + 15.0f, 20.0f, theme::kText);
+        // Same key on two actions?
+        bool clash = false;
+        // (Restart and Reload may share a key: restart is off in VS Bot, where R reloads.)
+        auto sharedOk = [&](int a, int b) { return (a == 1 && b == 5) || (a == 5 && b == 1); };
+        for (int j = 0; j < kRows; ++j) {
+            clash = clash || (j != i && !sharedOk(i, j) && *rows[j].code == *rows[i].code && *rows[i].code > 0);
+        }
+        const std::string label = rebinding_ == i ? "PRESS A KEY  (Esc cancels)" : input::BindName(*rows[i].code);
+        const Rectangle br = {rx + cw - 230.0f, ry + 5.0f, 222.0f, 44.0f};
+        if (Button(br, label, rebinding_ == i) && rebinding_ < 0) {
             rebinding_ = i;
             rebindStartFrame_ = frameCounter_;
         }
+        if (clash && rebinding_ != i) Border(br, 2.0f, theme::kWarn);
     }
-    Toggle(Rectangle{x, y + 372.0f, cw, 50.0f}, "Hold to scope (off = toggle, like Valorant's default)", &cfg_.scopeHold);
-    if (!xhMessage_.empty() && settingsTab_ == 5) Text(xhMessage_, x, y + 430.0f, 20.0f, theme::kWarn);
-    TextBlock("Shooting on a mouse button is read directly from Raw Input together with the movement, so each click is "
-              "evaluated at the exact crosshair position it happened at. A keyboard shoot key is evaluated per frame.",
-              x, y + 470.0f, cw, 20.0f, theme::kTextDim);
+    const float by = y + 30.0f + 7.0f * 62.0f + 10.0f;
+    Toggle(Rectangle{x, y + 30.0f + 6.0f * 62.0f + 8.0f, cw, 46.0f}, "Hold to scope (off = toggle)", &cfg_.scopeHold);
+    if (!xhMessage_.empty() && settingsTab_ == 5) Text(xhMessage_, x, by + 20.0f, 20.0f, theme::kWarn);
+    TextBlock("Keys with a yellow border are used twice. Shooting on a mouse button is read directly from Raw Input "
+              "together with the movement, so each click is evaluated at the exact crosshair position it happened at.",
+              x, by + 56.0f, w, 18.0f, theme::kTextDim);
 }
 
 // ===========================================================================

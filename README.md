@@ -178,6 +178,8 @@ Valtrainer shows your eDPI (`DPI × sens`) and cm/360
 | Pause / menu | Esc (always) or P |
 | Restart run (in VS Bot, R reloads) | R |
 | FPS counter on/off | F2 |
+| Move / walk / crouch / jump (VS Bot, Sniper) | W A S D, Left Shift, Left Ctrl, Space |
+| Reload (VS Bot) | R |
 
 Alt-tab or any focus loss (including screenshot tools) pauses the run and releases the cursor
 immediately. While paused or in the background the app drops to 60 FPS so other programs stay smooth.

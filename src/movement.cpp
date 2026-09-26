@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "camera.h"
+#include "input.h"
 
 namespace mv {
 
@@ -92,8 +93,9 @@ void Step(Mover& m, float wishX, float wishZ, float wishSpeed, bool crouch, floa
     Collide(m, boxes);
 }
 
-void StepPlayer(Mover& m, double yawDeg, bool live, float speedMult, float dt, const std::vector<Box>& boxes) {
-    const bool crouchKey = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+void StepPlayer(Mover& m, const MoveBinds& keys, double yawDeg, bool live, float speedMult, float dt,
+                const std::vector<Box>& boxes) {
+    const bool crouchKey = input::BindDown(keys.crouch);
     Crouch(m, crouchKey, dt);
 
     float wx = 0.0f, wz = 0.0f, speed = 0.0f;
@@ -102,18 +104,18 @@ void StepPlayer(Mover& m, double yawDeg, bool live, float speedMult, float dt, c
         const float fx = static_cast<float>(std::sin(y)), fz = static_cast<float>(-std::cos(y));
         const float rx = static_cast<float>(std::cos(y)), rz = static_cast<float>(std::sin(y));
         float ix = 0.0f, iz = 0.0f;
-        if (IsKeyDown(KEY_W)) { ix += fx; iz += fz; }
-        if (IsKeyDown(KEY_S)) { ix -= fx; iz -= fz; }
-        if (IsKeyDown(KEY_D)) { ix += rx; iz += rz; }
-        if (IsKeyDown(KEY_A)) { ix -= rx; iz -= rz; }
+        if (input::BindDown(keys.forward)) { ix += fx; iz += fz; }
+        if (input::BindDown(keys.back)) { ix -= fx; iz -= fz; }
+        if (input::BindDown(keys.right)) { ix += rx; iz += rz; }
+        if (input::BindDown(keys.left)) { ix -= rx; iz -= rz; }
         const float len = std::sqrt(ix * ix + iz * iz);
         if (len > 0.001f) {
             wx = ix / len;
             wz = iz / len;
-            const bool walk = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+            const bool walk = input::BindDown(keys.walk);
             speed = (m.crouch > 0.5f ? kCrouchSpeed : (walk ? kWalkSpeed : kRunSpeed)) * speedMult;
         }
-        if (IsKeyPressed(KEY_SPACE) && m.onGround) {
+        if (input::BindPressed(keys.jump) && m.onGround) {
             m.onGround = false;
             m.vel.y = kJumpSpeed;
         }

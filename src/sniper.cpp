@@ -142,7 +142,7 @@ public:
 
         // Player movement (scoped you move slower).
         const float speedMult = static_cast<float>(spec_.speedMult) * (zoomLevel_ > 0 ? kScopedSpeedMult : 1.0f);
-        StepPlayer(player_, ctx_.cam->Yaw(), !dead_, speedMult, fdt, moveBoxes_);
+        StepPlayer(player_, ctx_.moveKeys, ctx_.cam->Yaw(), !dead_, speedMult, fdt, moveBoxes_);
         ctx_.cam->SetEye(player_.Eye());
 
         // Next enemy: after a short gap, once the rifle is ready (so every

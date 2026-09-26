@@ -129,6 +129,7 @@ void App::ApplyDisplayMode() {
         }
     }
     platform::AllowMinimize();
+    monitorHz_ = GetMonitorRefreshRate(GetCurrentMonitor());
     platform::SetVSync(false);  // some drivers re-enable it after a mode change
     nextFrameDeadline_ = 0.0;
 }
@@ -246,7 +247,9 @@ void App::Frame() {
     if (screen_ != Screen::Playing) {
         // Menus: at least the monitor's refresh rate so they never feel
         // slower than the game, but not thousands of FPS for nothing.
-        const int menuCap = std::max(kMenuFpsLimit, GetMonitorRefreshRate(GetCurrentMonitor()) + 10);
+        // (The refresh rate is looked up once per display mode change: asking
+        // Windows every frame costs milliseconds and made menus stutter.)
+        const int menuCap = std::max(kMenuFpsLimit, monitorHz_ + 10);
         if (cap == 0 || cap > menuCap) cap = menuCap;
     }
     // Paused or in the background (Alt-Tab, screenshot tools): no need for
@@ -285,6 +288,14 @@ void App::StartRun(ModeId id, bool finderTest) {
     ctx.scopeBind = cfg_.keys.scope;
     ctx.scopeHold = cfg_.scopeHold;
     ctx.botTier = cfg_.botTier;
+    ctx.moveKeys.forward = cfg_.keys.forward;
+    ctx.moveKeys.back = cfg_.keys.back;
+    ctx.moveKeys.left = cfg_.keys.left;
+    ctx.moveKeys.right = cfg_.keys.right;
+    ctx.moveKeys.walk = cfg_.keys.walk;
+    ctx.moveKeys.crouch = cfg_.keys.crouch;
+    ctx.moveKeys.jump = cfg_.keys.jump;
+    ctx.reloadBind = cfg_.keys.reload;
 
     mode_.reset();  // destroy the old mode first (it may own world covers)
     cam_.Reset(0.0, 0.0);  // before creating the mode: it may move the eye
@@ -386,7 +397,15 @@ void App::UpdatePlaying(const std::vector<platform::RawEvent>& events, double no
         return;
     }
     // (VS Bot uses R to reload, so restart is only in the pause menu there.)
-    if (!finderRun_ && currentMode_ != ModeId::VsBot && input::BindPressed(cfg_.keys.restart)) {
+    // Restart hotkey, unless it's also a key the mode uses (R = reload in VS
+    // Bot; movement keys in VS Bot / Sniper). The pause menu always has RESTART.
+    const Keybinds& k = cfg_.keys;
+    const bool moves = currentMode_ == ModeId::VsBot || currentMode_ == ModeId::Sniper;
+    const bool restartTaken = currentMode_ == ModeId::VsBot ||
+                              (moves && (k.restart == k.forward || k.restart == k.back || k.restart == k.left ||
+                                         k.restart == k.right || k.restart == k.walk || k.restart == k.crouch ||
+                                         k.restart == k.jump));
+    if (!finderRun_ && !restartTaken && input::BindPressed(cfg_.keys.restart)) {
         StartRun(currentMode_, false);
         return;
     }

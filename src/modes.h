@@ -12,6 +12,7 @@
 
 #include "audio.h"
 #include "effects.h"
+#include "movement.h"
 #include "camera.h"
 #include "raylib.h"
 #include "rng.h"
@@ -36,6 +37,9 @@ struct GameContext {
     bool scopeHold = false; // hold to scope instead of toggle
     // VS Bot
     int botTier = 3;        // 0 Iron .. 8 Radiant
+    // Movement / reload keys (VS Bot, Sniper)
+    mv::MoveBinds moveKeys;
+    int reloadBind = KEY_R;
 };
 
 // Approximate Valorant sniper stats (zoom = magnification).

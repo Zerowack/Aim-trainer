@@ -53,6 +53,14 @@ Config::Config() {
     keys.pause = KEY_P;
     keys.toggleFps = KEY_F2;
     keys.scope = input::MouseBind(1);  // right mouse button
+    keys.forward = KEY_W;
+    keys.back = KEY_S;
+    keys.left = KEY_A;
+    keys.right = KEY_D;
+    keys.walk = KEY_LEFT_SHIFT;
+    keys.crouch = KEY_LEFT_CONTROL;
+    keys.jump = KEY_SPACE;
+    keys.reload = KEY_R;
 }
 
 int Config::FpsCap() const {
@@ -103,6 +111,14 @@ bool Config::Load(const std::string& path) {
     keys.pause = GetI(kv, "key_pause", keys.pause);
     keys.toggleFps = GetI(kv, "key_toggle_fps", keys.toggleFps);
     keys.scope = GetI(kv, "key_scope", keys.scope);
+    keys.forward = GetI(kv, "key_forward", keys.forward);
+    keys.back = GetI(kv, "key_back", keys.back);
+    keys.left = GetI(kv, "key_left", keys.left);
+    keys.right = GetI(kv, "key_right", keys.right);
+    keys.walk = GetI(kv, "key_walk", keys.walk);
+    keys.crouch = GetI(kv, "key_crouch", keys.crouch);
+    keys.jump = GetI(kv, "key_jump", keys.jump);
+    keys.reload = GetI(kv, "key_reload", keys.reload);
     scopedMult = ClampD(GetD(kv, "scoped_sens_multiplier", scopedMult), 0.01, 10.0);
     sniperWeapon = ClampI(GetI(kv, "sniper_weapon", sniperWeapon), 0, 2);
     botTier = ClampI(GetI(kv, "bot_tier", botTier), 0, 8);
@@ -146,6 +162,14 @@ bool Config::Save(const std::string& path) const {
     out << "key_pause=" << keys.pause << "\n";
     out << "key_toggle_fps=" << keys.toggleFps << "\n";
     out << "key_scope=" << keys.scope << "\n";
+    out << "key_forward=" << keys.forward << "\n";
+    out << "key_back=" << keys.back << "\n";
+    out << "key_left=" << keys.left << "\n";
+    out << "key_right=" << keys.right << "\n";
+    out << "key_walk=" << keys.walk << "\n";
+    out << "key_crouch=" << keys.crouch << "\n";
+    out << "key_jump=" << keys.jump << "\n";
+    out << "key_reload=" << keys.reload << "\n";
     out << "scoped_sens_multiplier=" << scopedMult << "\n";
     out << "sniper_weapon=" << sniperWeapon << "   # 0=marshal 1=outlaw 2=operator\n";
     out << "scope_hold=" << (scopeHold ? 1 : 0) << "\n";
