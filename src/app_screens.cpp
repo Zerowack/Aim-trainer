@@ -94,6 +94,14 @@ void DrawModeIcon(ModeId m, float cx, float cy, float s, Color c) {
             Fill(Rectangle{cx - s * 0.02f, cy - s * 0.07f, s * 0.2f, s * 0.5f}, c);
             Fill(Rectangle{cx - s * 0.5f, cy - s * 0.35f, s * 0.46f, s * 0.8f}, Alpha(c, 0.35f));
             break;
+        case ModeId::VsBot:
+            // Two agents facing each other.
+            Circle(Vector2{cx - s * 0.3f, cy - s * 0.24f}, s * 0.1f, c);
+            Fill(Rectangle{cx - s * 0.4f, cy - s * 0.12f, s * 0.2f, s * 0.5f}, c);
+            Circle(Vector2{cx + s * 0.3f, cy - s * 0.24f}, s * 0.1f, theme::kAccent);
+            Fill(Rectangle{cx + s * 0.2f, cy - s * 0.12f, s * 0.2f, s * 0.5f}, theme::kAccent);
+            Line(Vector2{cx - s * 0.12f, cy}, Vector2{cx + s * 0.12f, cy}, 2.0f, Alpha(c, 0.6f));
+            break;
         case ModeId::Sniper:
             // Scope: circle, reticle and a red dot.
             CircleLines(Vector2{cx, cy}, s * 0.42f, t, c);
@@ -120,17 +128,20 @@ void DrawModeIcon(ModeId m, float cx, float cy, float s, Color c) {
 }
 
 // Clickable card with a title, description, footer line and mode icon.
-bool Card(Rectangle r, ModeId mode, const std::string& title, const std::string& desc, const std::string& footer, int index) {
+bool Card(Rectangle r, ModeId mode, const std::string& title, const std::string& desc, const std::string& line1,
+          const std::string& line2) {
     const bool hover = Hover(r);
     const float a = HoverAnim(r);
     Angled(r, Lerp2(theme::kPanel, theme::kPanel2, a), 16.0f);
     // Accent edge grows on hover.
     Fill(Rectangle{r.x, r.y, 5.0f + 3.0f * a, r.height - 16.0f}, Lerp2(theme::kAccentDim, theme::kAccent, a));
-    Text(TextFormat("%02d", index), r.x + r.width - 24.0f, r.y + 16.0f, 20.0f, Alpha(theme::kTextDim, 0.5f), Align::Right);
-    TextBold(title, r.x + 26.0f, r.y + 12.0f, 27.0f, theme::kText);
-    TextBlock(desc, r.x + 26.0f, r.y + 48.0f, r.width - 140.0f, 17.0f, theme::kTextDim);
-    Text(footer, r.x + 26.0f + 6.0f * a, r.y + r.height - 30.0f, 17.0f, Lerp2(theme::kText, theme::kAccent, a));
-    DrawModeIcon(mode, r.x + r.width - 62.0f, r.y + r.height * 0.56f, 60.0f, Lerp2(theme::kTextDim, theme::kText, a));
+    DrawModeIcon(mode, r.x + r.width - 42.0f, r.y + 40.0f, 46.0f, Lerp2(theme::kTextDim, theme::kText, a));
+    TextBold(title, r.x + 22.0f, r.y + 12.0f, 24.0f, theme::kText);
+    TextBlock(desc, r.x + 22.0f, r.y + 46.0f, r.width - 44.0f, 15.0f, theme::kTextDim);
+    Text(line1, r.x + 22.0f, r.y + r.height - 50.0f, 15.0f, theme::kText);
+    Text(line2, r.x + 22.0f, r.y + r.height - 28.0f, 15.0f, theme::kTextDim);
+    Text(">  PLAY", r.x + r.width - 22.0f - 6.0f * a, r.y + r.height - 30.0f, 17.0f, Lerp2(theme::kTextDim, theme::kAccent, a),
+         Align::Right);
     return hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
@@ -216,32 +227,44 @@ void App::ScreenMainMenu() {
          theme::kTextDim);
     Text(TextFormat("v%s", kAppVersion), x0 + kContentWidth, VH() - 40.0f, 18.0f, Alpha(theme::kTextDim, 0.7f), Align::Right);
 
-    // Mode cards: 2 columns x 4 rows.
-    const float cw = 470.0f, ch = 130.0f, gap = 14.0f;
+    // Mode cards: 3 columns x 3 rows.
+    const float gridW = 968.0f, gap = 12.0f;
+    const float cw = (gridW - 2.0f * gap) / 3.0f, ch = 172.0f;
     for (int i = 0; i < kPlayableModeCount; ++i) {
         const ModeId m = static_cast<ModeId>(i);
-        const float cx = x0 + static_cast<float>(i % 2) * (cw + gap);
-        const float cy = 200.0f + static_cast<float>(i / 2) * (ch + gap);
+        const float cx = x0 + static_cast<float>(i % 3) * (cw + gap);
+        const float cy = 200.0f + static_cast<float>(i / 3) * (ch + gap);
         long long best = 0;
-        std::string footer = m == ModeId::Sniper ? std::string(SniperName(static_cast<SniperWeapon>(cfg_.sniperWeapon))) + "   " : "";
-        footer += stats_.BestScore(m, currentDifficulty_, best)
-                                 ? "BEST " + std::to_string(best) + " (" + DifficultyName(currentDifficulty_) + ")   "
-                                 : "";
-        AimRank mr;
-        if (ModeRank(stats_, m, mr)) footer += RankLabel(mr) + "   ";
-        footer += ">  PLAY";
-        if (Card(Rectangle{cx, cy, cw, ch}, m, ModeName(m), ModeDescription(m), footer, i + 1)) {
-            if (m == ModeId::Sniper) screen_ = Screen::SniperSelect;  // pick the rifle first
-            else ChooseDifficulty(m);
+        std::string line1, line2;
+        if (m == ModeId::VsBot) {
+            line1 = std::string("Bot: ") + TierName(cfg_.botTier);
+            int wins = 0, losses = 0;
+            for (const RunRecord* r : stats_.ForMode(m)) {
+                if (r->roundsWon < 0) continue;
+                if (r->roundsWon > r->roundsLost) ++wins;
+                else ++losses;
+            }
+            line2 = TextFormat("Matches  %d W  /  %d L", wins, losses);
+        } else {
+            line1 = stats_.BestScore(m, currentDifficulty_, best)
+                        ? "BEST " + std::to_string(best) + " (" + DifficultyName(currentDifficulty_) + ")"
+                        : std::string("No runs yet (") + DifficultyName(currentDifficulty_) + ")";
+            AimRank mr;
+            line2 = ModeRank(stats_, m, mr) ? RankLabel(mr) : "Unranked";
+            if (m == ModeId::Sniper) line2 += std::string("  |  ") + SniperName(static_cast<SniperWeapon>(cfg_.sniperWeapon));
+        }
+        const std::string title = m == ModeId::Placement ? "Placement" : ModeName(m);
+        if (Card(Rectangle{cx, cy, cw, ch}, m, title, ModeDescription(m), line1, line2)) {
+            OpenModeSetup(m);
             return;
         }
     }
     Text(TextFormat("Runs last %d s (change in Settings > Gameplay)  |  Esc pause  |  %s restart  |  %s FPS counter",
                     cfg_.runSeconds, input::BindName(cfg_.keys.restart).c_str(), input::BindName(cfg_.keys.toggleFps).c_str()),
-         x0, 200.0f + 4.0f * (ch + gap) + 6.0f, 18.0f, theme::kTextDim);
+         x0, 200.0f + 3.0f * (ch + gap) + 6.0f, 18.0f, theme::kTextDim);
 
     // Right column.
-    const float rx = x0 + 2.0f * (cw + gap) + 40.0f;
+    const float rx = x0 + gridW + 40.0f;
     const float rw = kContentWidth - (rx - x0);
     Angled(Rectangle{rx, 200.0f, rw, 250.0f}, theme::kPanel, 16.0f);
     Text("YOUR SENSITIVITY", rx + 24.0f, 220.0f, 20.0f, theme::kAccent);
@@ -317,10 +340,18 @@ void App::ScreenMainMenu() {
 void App::ScreenResults() {
     const float x0 = ContentX();
     const RunStats& s = lastStats_;
-    Title(std::string(ModeName(s.mode)) + (s.mode == ModeId::Sniper ? std::string(" ") + SniperName(s.weapon) : std::string()) +
-              " (" + DifficultyName(s.difficulty) + ")  -  RESULTS",
-          x0, 60.0f, 52.0f);
-    if (lastWasPb_) {
+    if (s.mode == ModeId::VsBot) {
+        Title(TextFormat("VS BOT (%s)  -  %s", TierName(s.botTier), s.roundsWon > s.roundsLost ? "VICTORY" : "DEFEAT"), x0, 60.0f,
+              52.0f);
+    } else {
+        Title(std::string(ModeName(s.mode)) + (s.mode == ModeId::Sniper ? std::string(" ") + SniperName(s.weapon) : std::string()) +
+                  " (" + DifficultyName(s.difficulty) + ")  -  RESULTS",
+              x0, 60.0f, 52.0f);
+    }
+    if (s.mode == ModeId::VsBot) {
+        Text(TextFormat("First to 5 rounds  |  %d rounds played", s.roundsWon + s.roundsLost), x0 + 6.0f, 144.0f, 22.0f,
+             theme::kTextDim);
+    } else if (lastWasPb_) {
         Angled(Rectangle{x0 + 6.0f, 136.0f, 330.0f, 40.0f}, theme::kAccent, 10.0f);
         Text(hadPreviousBest_ ? "NEW PERSONAL BEST" : "FIRST RUN - PB SET", x0 + 171.0f, 144.0f, 22.0f, theme::kText,
              Align::Center);
@@ -367,13 +398,42 @@ void App::ScreenResults() {
     } else {
         tile(3, 1, "AVG CLICK ERROR", s.MeanErrDeg() >= 0.0 ? Fmt(s.MeanErrDeg(), 2) + " deg" : "-", theme::kText);
     }
+    if (s.mode == ModeId::VsBot) {
+        // Match summary replaces the aim-mode tiles.
+        const bool won = s.roundsWon > s.roundsLost;
+        tile(0, 0, "RESULT", TextFormat("%s  %d - %d", won ? "WIN" : "LOSS", s.roundsWon, s.roundsLost), won ? theme::kGood : theme::kAccent);
+        tile(1, 0, "K / D", TextFormat("%d / %d", s.kills, s.deaths), theme::kAccent);
+        tile(2, 0, "HEADSHOT %", s.hits > 0 ? Fmt(100.0 * s.headshots / s.hits, 0) + "%" : "-", theme::kGood);
+        tile(3, 0, "ACCURACY", Fmt(s.Accuracy() * 100.0, 1) + "%", theme::kWarn);
+        tile(0, 1, "AVG REACTION (SEE -> SHOOT)", MsOrDash(s.AvgReactionMs()), theme::kText);
+        tile(1, 1, "AVG TIME TO KILL", MsOrDash(s.AvgTtkMs()), theme::kText);
+        tile(2, 1, "SHOTS WHILE MOVING", s.shots > 0 ? Fmt(100.0 * s.movingShots / s.shots, 0) + "%" : "-",
+             s.shots > 0 && s.movingShots * 4 > s.shots ? theme::kAccent : theme::kText);
+        tile(3, 1, "DAMAGE DEALT / TAKEN", TextFormat("%.0f / %.0f", s.damageDealt, s.damageTaken), theme::kText);
+    }
 
     // Coaching tips.
     // Rank strip: this run's rank, progress, mode rank and a comment.
     {
         const Rectangle rr = {x0, 424.0f, kContentWidth, 104.0f};
         Angled(rr, theme::kPanel, 14.0f);
-        if (lastRunRanked_) {
+        if (s.mode == ModeId::VsBot) {
+            AimRank br;
+            br.tier = s.botTier;
+            br.division = 3;
+            const bool won = s.roundsWon > s.roundsLost;
+            Fill(Rectangle{rr.x, rr.y, 5.0f, rr.height - 14.0f}, TierColor(s.botTier));
+            DrawRankBadge(rr.x + 56.0f, rr.y + 50.0f, 66.0f, br, 1.0f, false);
+            Text("OPPONENT", rr.x + 110.0f, rr.y + 12.0f, 16.0f, theme::kTextDim);
+            TextBold(TextFormat("%s bot", TierName(s.botTier)), rr.x + 110.0f, rr.y + 32.0f, 30.0f, TierColor(s.botTier));
+            const char* next = won ? (s.botTier < kTierCount - 1 ? TextFormat("You beat it. Try %s next.", TierName(s.botTier + 1))
+                                                                   : "You beat Radiant. Nothing left to prove.")
+                                   : (s.botTier > 0 ? TextFormat("Too strong for now. Warm up against %s.", TierName(s.botTier - 1))
+                                                    : "Lost to Iron. Uninstall? Kidding. Mostly.");
+            Text(next, rr.x + 110.0f, rr.y + 72.0f, 20.0f, theme::kText);
+            Text("Matches don't count towards your aim rank", rr.x + rr.width - 24.0f, rr.y + 14.0f, 16.0f,
+                 Alpha(theme::kTextDim, 0.7f), Align::Right);
+        } else if (lastRunRanked_) {
             Fill(Rectangle{rr.x, rr.y, 5.0f, rr.height - 14.0f}, TierColor(lastRunRank_.tier));
             DrawRankBadge(rr.x + 56.0f, rr.y + 46.0f, 66.0f, lastRunRank_);
             Text("THIS RUN", rr.x + 110.0f, rr.y + 12.0f, 16.0f, theme::kTextDim);
@@ -868,8 +928,7 @@ void App::ScreenStats() {
         return;
     }
     if (Button(Rectangle{x0 + 280.0f, VH() - 100.0f, 360.0f, 60.0f}, TextFormat("PLAY %s", ModeName(m)))) {
-        if (m == ModeId::Sniper) screen_ = Screen::SniperSelect;
-        else ChooseDifficulty(m);
+        OpenModeSetup(m);
         return;
     }
     Text("All runs are stored in stats.csv next to the .exe.", x0 + 670.0f, VH() - 80.0f, 18.0f, theme::kTextDim);
@@ -1120,6 +1179,7 @@ void App::ScreenRank() {
     const float mx = x0 + 660.0f, mw = kContentWidth - 660.0f;
     for (int i = 0; i < kPlayableModeCount; ++i) {
         const ModeId m = static_cast<ModeId>(i);
+        if (m == ModeId::VsBot) continue;  // matches are not part of the aim rank
         const Rectangle row = {mx, 160.0f + static_cast<float>(i) * 70.0f, mw, 62.0f};
         Angled(row, theme::kPanel, 12.0f);
         AimRank mr;
@@ -1292,4 +1352,61 @@ void App::ScreenSniperSelect() {
         screen_ = Screen::MainMenu;
     }
     Text("Keys 1-3 pick a rifle, Enter repeats the last one.", x0 + 290.0f, VH() - 80.0f, 18.0f, theme::kTextDim);
+}
+
+// ===========================================================================
+// Mode setup routing and the VS Bot rank picker
+
+void App::OpenModeSetup(ModeId mode) {
+    if (mode == ModeId::Sniper) screen_ = Screen::SniperSelect;  // rifle first, then difficulty
+    else if (mode == ModeId::VsBot) screen_ = Screen::BotSelect;  // bot rank instead of difficulty
+    else ChooseDifficulty(mode);
+}
+
+void App::ScreenBotSelect() {
+    const float x0 = ContentX();
+    Title("VS BOT", x0, 50.0f, 52.0f);
+    Text("CHOOSE THE BOT'S RANK", x0 + 6.0f, 124.0f, 22.0f, theme::kAccent);
+    Text("1v1, first to 5 rounds. WASD move, Shift walk, Ctrl crouch, Space jump, R reload. Counter-strafe before you shoot.",
+         x0 + 6.0f, 156.0f, 20.0f, theme::kTextDim);
+
+    static const char* const blurbs[kTierCount] = {
+        "Sprays while running. Misses a lot.", "Slow to react, rarely stops to shoot.", "Hits you sometimes. Mostly body.",
+        "Decent aim, starts counter-strafing.", "Quick and fairly accurate.", "Taps heads, strafes between bursts.",
+        "Fast, precise, disciplined movement.", "Near-instant reactions, mostly heads.", "Brutal. Don't blink."};
+    const float gap = 14.0f;
+    const float cw = (kContentWidth - 2.0f * gap) / 3.0f, ch = 158.0f;
+    int picked = -1;
+    for (int i = 0; i < kTierCount; ++i) {
+        const Rectangle r = {x0 + static_cast<float>(i % 3) * (cw + gap), 200.0f + static_cast<float>(i / 3) * (ch + gap), cw, ch};
+        const float a = HoverAnim(r);
+        const bool last = i == cfg_.botTier;
+        Angled(r, Lerp2(theme::kPanel, theme::kPanel2, a), 16.0f);
+        Fill(Rectangle{r.x, r.y, 5.0f + 3.0f * a, r.height - 16.0f}, TierColor(i));
+        if (last) Border(r, 2.0f, Alpha(TierColor(i), 0.7f));
+        AimRank tr;
+        tr.tier = i;
+        tr.division = 3;
+        DrawRankBadge(r.x + 70.0f, r.y + r.height * 0.5f - 4.0f, 96.0f, tr, 1.0f, false);
+        TextBold(TierName(i), r.x + 136.0f, r.y + 18.0f, 30.0f, TierColor(i));
+        TextBlock(blurbs[i], r.x + 136.0f, r.y + 60.0f, r.width - 160.0f, 17.0f, theme::kTextDim);
+        // Reaction times shown here match the bot skill table in vsbot.cpp.
+        static const int reactMs[kTierCount] = {540, 450, 380, 320, 280, 245, 215, 190, 165};
+        Text(TextFormat("Reaction ~%d ms", reactMs[i]), r.x + 136.0f, r.y + r.height - 34.0f, 16.0f, theme::kText);
+        if (last) Text("LAST USED", r.x + r.width - 20.0f, r.y + 20.0f, 15.0f, TierColor(i), Align::Right);
+        if (Hover(r) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) picked = i;
+        if (IsKeyPressed(KEY_ONE + i) || IsKeyPressed(KEY_KP_1 + i)) picked = i;
+    }
+    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER)) picked = cfg_.botTier;
+
+    if (picked >= 0) {
+        cfg_.botTier = picked;
+        SaveConfig();
+        StartRun(ModeId::VsBot, false);
+        return;
+    }
+    if (Button(Rectangle{x0, VH() - 100.0f, 260.0f, 60.0f}, "BACK") || IsKeyPressed(KEY_ESCAPE)) {
+        screen_ = Screen::MainMenu;
+    }
+    Text("Keys 1-9 pick a rank, Enter repeats the last one.", x0 + 290.0f, VH() - 80.0f, 18.0f, theme::kTextDim);
 }

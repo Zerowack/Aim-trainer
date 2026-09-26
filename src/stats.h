@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-enum class ModeId : int { Gridshot = 0, Microshot, Tracking, Flick180, Reaction, Peek, Placement, Sniper, Mixed, Count };
+enum class ModeId : int { Gridshot = 0, Microshot, Tracking, Flick180, Reaction, Peek, Placement, Sniper, VsBot, Mixed, Count };
 
-constexpr int kPlayableModeCount = 8;  // everything except Mixed (sens finder only)
+constexpr int kPlayableModeCount = 9;  // everything except Mixed (sens finder only)
 
 // Sniper rifles for the Sniper mode.
 enum class SniperWeapon : int { Marshal = 0, Outlaw, Operator, Count };
@@ -79,6 +79,16 @@ struct RunStats {
     double headLevelTime = 0.0;
     double headLevelTotal = 0.0;
 
+    // VS Bot matches.
+    int botTier = 3;         // 0 Iron .. 8 Radiant
+    int roundsWon = 0;
+    int roundsLost = 0;
+    int kills = 0;
+    int deaths = 0;
+    double damageDealt = 0.0;
+    double damageTaken = 0.0;
+    int movingShots = 0;     // shots fired while moving too fast to be accurate
+
     int Misses() const { return shots - hits; }
     double Accuracy() const;            // 0..1 (tracking uses on-target / firing time)
     double AvgReactionMs() const;       // < 0 if no data
@@ -119,6 +129,9 @@ struct RunRecord {
     double sens = 0.0;
     double dpi = 0.0;
     double placementErr = -1.0;  // Crosshair Placement mode, degrees
+    int roundsWon = -1;          // VS Bot only
+    int roundsLost = -1;
+    int botTier = -1;
 };
 
 RunRecord MakeRecord(const RunStats& s, double sens, double dpi);

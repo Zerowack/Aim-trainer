@@ -13,9 +13,11 @@ Valorant:
   crosshair position where it happened, even in the middle of a frame.
 - **Timing:** FPS is uncapped by default with V-Sync off. You can set an optional cap (144/240/360, or any custom value from 30 to 2000),
   and an FPS counter shows frame time. All timing uses `QueryPerformanceCounter`.
-- **Eight modes:** Gridshot, Microshot, Tracking (ADAD strafes), Flick 180, Reaction, Peek Practice,
+- **Eight training modes:** Gridshot, Microshot, Tracking (ADAD strafes), Flick 180, Reaction, Peek Practice,
   Crosshair Placement and Sniper (Marshal / Outlaw / Operator), each with Easy / Normal / Hard / Insane
   difficulty. The **scoped sensitivity multiplier** works like Valorant's.
+- **VS Bot:** a 1v1 duel in a box arena against a bot from Iron to Radiant. You move like in
+  Valorant: run, walk, crouch, jump, counter-strafe, with movement inaccuracy and a rifle spray.
 - **Sens Finder:** uses the Perfect Sensitivity Approximation (PSA) method. It runs 7 rounds of blind A/B
   tests, draws a graph of your results, and has a one-click "apply" button. Every session
   is saved and combined into an average across days.
@@ -171,7 +173,7 @@ Valtrainer shows your eDPI (`DPI × sens`) and cm/360
 |---|---|
 | Shoot | Mouse 1 |
 | Pause / menu | Esc (always) or P |
-| Restart run | R |
+| Restart run (in VS Bot, R reloads) | R |
 | FPS counter on/off | F2 |
 
 Alt-tab or any focus loss pauses the run and releases the cursor immediately. To minimize in any display
@@ -200,6 +202,38 @@ mode, use **MINIMIZE** on the main menu or in the pause menu, or press Alt-Tab o
    land. Each rifle has its own fire rate, magazine and reload, based on Valorant's. Agents only
    appear once your rifle is ready, so every rifle can reach the same rank. Choose toggle or hold
    to scope, and rebind Scope, in Settings → Keybinds.
+
+9. **VS Bot**: a skirmish-style 1v1 against a bot in an arena full of boxes. Tall boxes are full
+   cover; low boxes let you crouch behind them with your head still showing. First pick the bot's
+   rank (Iron → Radiant, keys 1–9). The match is first to 5 rounds, with 60 s per round and a 2.5 s freeze time.
+
+   | Action | Key |
+   |---|---|
+   | Move | W A S D |
+   | Walk (quiet, slower) | Shift (hold) |
+   | Crouch | Ctrl (hold) |
+   | Jump | Space |
+   | Reload | R |
+   | Shoot (full auto) | Mouse 1 (hold) |
+
+   The mechanics copy Valorant's (numbers are close approximations, not Riot data):
+   - **Movement:** run 5.4 m/s, walk 2.9 m/s, crouch 1.9 m/s. Acceleration and stopping are very fast.
+     Pressing the opposite key (**counter-strafe**) stops you faster than letting go.
+     Crouching lowers your eye from 1.6 m to 1.12 m in 0.12 s.
+   - **Accuracy:** you are only accurate below ~1.35 m/s. Running adds up to +5° of spread and
+     jumping about 8°. Crouching while standing still is a bit tighter. The hint under the
+     crosshair tells you ACCURATE / MOVING / AIRBORNE.
+   - **Rifle (Vandal-like):** 9.75 rounds/s, 25-round magazine, 2.5 s reload. Damage is 160 head
+     (one-tap), 40 body, 34 legs. The spray kicks upward for the first ~8 bullets and then sways
+     sideways; tap or burst to reset it (0.35 s).
+   - **Health:** 100 HP + 50 shield (150 total).
+
+   The bot sees you only with line of sight inside its 110° view cone, and hears you run within 20 m.
+   Higher ranks react faster (Iron ~540 ms → Radiant ~165 ms), turn faster, and correct their aim
+   quicker. They also aim more at heads, counter-strafe before shooting instead of running and gunning,
+   control recoil, and ADAD or crouch between bursts. If nobody meets for a while, the bot hunts you.
+   The results screen shows rounds, K/D, headshot %, accuracy, reaction time, TTK, damage, and how many
+   of your shots were fired while moving (the #1 thing to fix). VS Bot matches are **unranked**: they don't count towards your aim rank.
 
 **Scoped sensitivity:** Settings → Sensitivity → *Scoped sensitivity multiplier* is the same
 setting as Valorant's (Settings → General → Mouse). While scoped, each mouse count turns
@@ -281,8 +315,9 @@ Copy the new value into Valorant to keep both games the same. Everything is appe
 | `src/input.h`, `src/input.cpp` | keybinds and in-order processing of the raw mouse stream |
 | `src/camera.h`, `src/camera.cpp` | Valorant sens / cm360 / FOV math, camera, aim history |
 | `src/targets.h`, `src/targets.cpp` | hitbox sizes, ray hit tests, target drawing |
-| `src/world.h`, `src/world.cpp` | shooting range, lighting shader, cover boxes |
-| `src/modes.h`, `src/modes.cpp` | the six training modes and the mixed Sens Finder test |
+| `src/world.h`, `src/world.cpp` | shooting range, lighting shader, cover boxes and arena walls |
+| `src/modes.h`, `src/modes.cpp` | the training modes and the mixed Sens Finder test |
+| `src/vsbot.cpp` | VS Bot: Valorant-style movement, rifle, arena and bot AI per rank |
 | `src/sens_finder.h`, `src/sens_finder.cpp` | PSA logic, scoring, session storage and averaging |
 | `src/stats.h`, `src/stats.cpp` | run statistics, coaching tips, `stats.csv` |
 | `src/rank.h`, `src/rank.cpp` | estimated aim rank (tier thresholds per mode), roasts |

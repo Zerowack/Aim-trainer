@@ -17,7 +17,7 @@
 #include "stats.h"
 #include "world.h"
 
-constexpr const char* kAppVersion = "1.7.1";
+constexpr const char* kAppVersion = "1.8.0";
 
 // Game clock = real time minus all time spent paused.
 struct GameClock {
@@ -53,7 +53,8 @@ enum class Screen {
     FinderFinal,
     Rank,
     Difficulty,
-    SniperSelect
+    SniperSelect,
+    BotSelect
 };
 
 class App {
@@ -106,6 +107,9 @@ private:
     void ScreenRank();
     void ScreenDifficulty();
     void ScreenSniperSelect();
+    void ScreenBotSelect();
+    // Opens the right picker for a mode (rifle / bot rank / difficulty).
+    void OpenModeSetup(ModeId mode);
     // Opens the difficulty picker for a mode (then starts the run).
     void ChooseDifficulty(ModeId mode);
     // Roast or neutral description, depending on the setting.

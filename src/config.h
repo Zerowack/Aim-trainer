@@ -51,6 +51,7 @@ struct Config {
     bool roastMode = true;
     int difficulty = 1;          // last picked difficulty (0 easy .. 3 insane)
     int sniperWeapon = 2;        // 0 Marshal, 1 Outlaw, 2 Operator
+    int botTier = 3;             // VS Bot: 0 Iron .. 8 Radiant
     bool scopeHold = false;      // hold to scope (Valorant "Hold to aim down sights")       // funny rank comments ("your aim is ...")
 
     // Audio

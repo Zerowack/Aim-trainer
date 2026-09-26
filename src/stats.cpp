@@ -12,7 +12,7 @@ namespace {
 
 const char* const kCsvHeader =
     "timestamp,mode,duration_s,score,accuracy_pct,hits,misses,avg_reaction_ms,avg_ttk_ms,overshoot_pct,"
-    "tracking_pct,sens,dpi,difficulty,placement_err_deg,weapon";
+    "tracking_pct,sens,dpi,difficulty,placement_err_deg,weapon,rounds_won,rounds_lost,bot_tier";
 
 std::vector<std::string> SplitCsv(const std::string& line) {
     std::vector<std::string> out;
@@ -53,6 +53,7 @@ const char* ModeName(ModeId m) {
         case ModeId::Peek: return "Peek Practice";
         case ModeId::Placement: return "Crosshair Placement";
         case ModeId::Sniper: return "Sniper";
+        case ModeId::VsBot: return "VS Bot";
         case ModeId::Mixed: return "Sens Finder Test";
         default: return "?";
     }
@@ -74,6 +75,7 @@ const char* ModeKey(ModeId m) {
         case ModeId::Peek: return "peek";
         case ModeId::Placement: return "placement";
         case ModeId::Sniper: return "sniper";
+        case ModeId::VsBot: return "vsbot";
         case ModeId::Mixed: return "mixed";
         default: return "unknown";
     }
@@ -89,6 +91,7 @@ const char* ModeDescription(ModeId m) {
         case ModeId::Peek: return "Agents peek from behind cover for a split second. Hold the angle.";
         case ModeId::Placement: return "Keep your crosshair at head level on the angles. Scored on pre-aim.";
         case ModeId::Sniper: return "Marshal, Outlaw or Operator. Scope in and pick agents off at long range.";
+        case ModeId::VsBot: return "1v1 duel against a bot from Iron to Radiant. Move, crouch, counter-strafe, first to 5.";
         case ModeId::Mixed: return "20 s of flicks, tracking and micro-adjustments.";
         default: return "";
     }
@@ -259,7 +262,24 @@ std::vector<std::string> BuildTips(const RunStats& s, double sens) {
         else if (rt < 220.0) tips.push_back("Excellent reaction time (" + Fmt(rt, 0) + " ms).");
     }
 
-    // 5) Crosshair placement.
+    // 5) VS Bot: movement discipline.
+    if (s.mode == ModeId::VsBot && s.shots >= 10) {
+        const double moving = static_cast<double>(s.movingShots) / s.shots;
+        if (moving > 0.25) {
+            tips.push_back(Fmt(moving * 100.0, 0) +
+                           "% of your shots were fired while moving - they fly wide. Counter-strafe: tap the opposite "
+                           "key (A after D) and shoot the instant you stop.");
+        } else {
+            tips.push_back("Good discipline: only " + Fmt(moving * 100.0, 0) + "% of shots fired while moving.");
+        }
+        const double hs = s.hits > 0 ? static_cast<double>(s.headshots) / s.hits : 0.0;
+        if (s.hits >= 5 && hs < 0.2) {
+            tips.push_back("Only " + Fmt(hs * 100.0, 0) +
+                           "% headshots. Keep your crosshair at head height - a single Vandal headshot kills.");
+        }
+    }
+
+    // 6) Crosshair placement.
     const double place = s.MeanPlacementErr();
     if (place >= 0.0 && s.placementCount >= 5) {
         const double vert = s.MeanPlacementVert();
@@ -281,7 +301,7 @@ std::vector<std::string> BuildTips(const RunStats& s, double sens) {
         }
     }
 
-    // 6) Precision.
+    // 7) Precision.
     const double errNorm = s.MeanErrNorm();
     if (errNorm > 1.3 && s.errCount >= 8) {
         tips.push_back("Clicks land " + Fmt(errNorm, 1) +
@@ -307,6 +327,11 @@ RunRecord MakeRecord(const RunStats& s, double sens, double dpi) {
     r.weapon = s.weapon;
     r.duration = s.duration;
     r.placementErr = s.MeanPlacementErr();
+    if (s.mode == ModeId::VsBot) {
+        r.roundsWon = s.roundsWon;
+        r.roundsLost = s.roundsLost;
+        r.botTier = s.botTier;
+    }
     r.score = s.score;
     r.accuracy = s.Accuracy() * 100.0;
     r.hits = s.hits;
@@ -367,6 +392,11 @@ void StatsStore::Load(const std::string& path) {
         if (f.size() >= 14) DifficultyFromKey(f[13], r.difficulty);
         if (f.size() >= 15) r.placementErr = ToD(f[14], -1.0);
         if (f.size() >= 16) SniperFromKey(f[15], r.weapon);
+        if (f.size() >= 19) {
+            r.roundsWon = static_cast<int>(ToD(f[16], -1.0));
+            r.roundsLost = static_cast<int>(ToD(f[17], -1.0));
+            r.botTier = static_cast<int>(ToD(f[18], -1.0));
+        }
         records_.push_back(r);
     }
 }
@@ -385,7 +415,8 @@ bool StatsStore::Append(const RunRecord& r) {
         << Fmt(r.accuracy, 2) << ',' << r.hits << ',' << r.misses << ',' << Fmt(r.avgReactionMs, 1) << ','
         << Fmt(r.avgTtkMs, 1) << ',' << Fmt(r.overshootPct, 1) << ',' << Fmt(r.trackingPct, 2) << ','
         << Fmt(r.sens, 4) << ',' << Fmt(r.dpi, 0) << ',' << DifficultyKey(r.difficulty) << ','
-        << Fmt(r.placementErr, 2) << ',' << (r.mode == ModeId::Sniper ? SniperKey(r.weapon) : "-") << "\n";
+        << Fmt(r.placementErr, 2) << ',' << (r.mode == ModeId::Sniper ? SniperKey(r.weapon) : "-") << ',' << r.roundsWon
+        << ',' << r.roundsLost << ',' << r.botTier << "\n";
     return static_cast<bool>(out);
 }
 

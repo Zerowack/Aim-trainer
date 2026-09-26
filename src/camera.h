@@ -77,7 +77,10 @@ class ValCamera {
 public:
     static constexpr float kEyeHeight = 1.6f;  // metres
 
+    // Resets the view angles and puts the eye back at the default position.
     void Reset(double yawDeg = 0.0, double pitchDeg = 0.0);
+    // Moves the eye (VS Bot mode walks around; every other mode stands still).
+    void SetEye(Vector3 eye) { eye_ = eye; }
     // dx > 0 turns right, dy > 0 (mouse pulled toward you) looks down.
     void ApplyCounts(long dx, long dy, double sens);
 
@@ -89,6 +92,7 @@ public:
     Camera3D ToRaylib(double zoom = 1.0) const;
 
 private:
+    Vector3 eye_ = {0.0f, kEyeHeight, 0.0f};
     double yaw_ = 0.0;    // degrees, 0 = looking down -Z, positive = right
     double pitch_ = 0.0;  // degrees, positive = up
 };

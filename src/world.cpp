@@ -1,6 +1,7 @@
 // world.cpp - range geometry and the lighting shader.
 #include "world.h"
 
+#include <algorithm>
 #include <cfloat>
 
 #include "rlgl.h"
@@ -215,9 +216,14 @@ void World::DrawCovers() const {
     const Color edge = Shade(Color{210, 64, 76, 255}, brightness_);
     for (const Box& box : covers_) {
         DrawBoxLit(box.center, box.size, c, Surface::Plain);
-        // Thin accent strip on top so the edges are easy to read.
-        DrawBoxLit(Vector3{box.center.x, box.center.y + box.size.y * 0.5f + 0.02f, box.center.z},
-                   Vector3{box.size.x, 0.04f, box.size.z}, edge, Surface::Plain);
+        // Thin red rim around the top so the edges are easy to read.
+        const float top = box.center.y + box.size.y * 0.5f + 0.015f;
+        const float rim = std::min(0.07f, std::min(box.size.x, box.size.z) * 0.25f);
+        const float hx = box.size.x * 0.5f - rim * 0.5f, hz = box.size.z * 0.5f - rim * 0.5f;
+        DrawBoxLit(Vector3{box.center.x, top, box.center.z - hz}, Vector3{box.size.x, 0.03f, rim}, edge, Surface::Plain);
+        DrawBoxLit(Vector3{box.center.x, top, box.center.z + hz}, Vector3{box.size.x, 0.03f, rim}, edge, Surface::Plain);
+        DrawBoxLit(Vector3{box.center.x - hx, top, box.center.z}, Vector3{rim, 0.03f, box.size.z}, edge, Surface::Plain);
+        DrawBoxLit(Vector3{box.center.x + hx, top, box.center.z}, Vector3{rim, 0.03f, box.size.z}, edge, Surface::Plain);
     }
 }
 

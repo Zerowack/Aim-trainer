@@ -32,6 +32,8 @@ struct GameContext {
     SniperWeapon weapon = SniperWeapon::Operator;
     int scopeBind = 1001;   // input bind code (default Mouse 2)
     bool scopeHold = false; // hold to scope instead of toggle
+    // VS Bot
+    int botTier = 3;        // 0 Iron .. 8 Radiant
 };
 
 // Approximate Valorant sniper stats (zoom = magnification).
@@ -100,6 +102,11 @@ public:
     // Full-screen overlay drawn under the HUD (e.g. the sniper scope).
     virtual void DrawOverlay() const {}
     virtual void OnButton(int /*bindCode*/, bool /*down*/, double /*t*/) {}
+    // Modes that end on their own (VS Bot match) return true when done.
+    virtual bool Finished() const { return false; }
+    // Replace the run timer in the HUD (VS Bot shows the round timer and
+    // score instead). Return false to use the normal timer.
+    virtual bool HudTimer(double /*t*/, double& /*secondsLeft*/, std::string& /*label*/) const { return false; }
     // Mode specific HUD (virtual UI coordinates, see ui.h).
     virtual void DrawHud(double t) const;
 
@@ -153,3 +160,4 @@ protected:
 };
 
 std::unique_ptr<Mode> CreateMode(ModeId id, const GameContext& ctx);
+std::unique_ptr<Mode> CreateVsBotMode(const GameContext& ctx);  // vsbot.cpp

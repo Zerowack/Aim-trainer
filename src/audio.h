@@ -3,7 +3,7 @@
 
 #include "raylib.h"
 
-enum class Sfx : int { Hit = 0, Kill, Headshot, Miss, Tick, CountBeep, CountGo, UiClick, Count };
+enum class Sfx : int { Hit = 0, Kill, Headshot, Miss, Tick, CountBeep, CountGo, UiClick, Shot, EnemyShot, Hurt, Count };
 
 class Audio {
 public:

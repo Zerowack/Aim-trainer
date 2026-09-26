@@ -29,11 +29,13 @@ struct Target {
     double hitFlash = 0.0;    // visual feedback timer
     bool beingHit = false;    // tracking: crosshair on target while firing
     int tag = 0;              // mode specific (e.g. grid cell)
+    float crouch = 0.0f;      // humanoids: 0 = standing, 1 = fully crouched
 };
 
 struct TargetHit {
     bool hit = false;
     bool head = false;
+    bool legs = false;
     float distance = 0.0f;
 };
 

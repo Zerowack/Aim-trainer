@@ -85,6 +85,9 @@ bool Audio::Init() {
     const Tone beep[] = {{660, 660, 0.12, 12, 0.0, 0.15, 0.45}};
     const Tone go[] = {{990, 990, 0.22, 8, 0.0, 0.20, 0.50}};
     const Tone click[] = {{1800, 1400, 0.025, 120, 0.15, 0.0, 0.25}};
+    const Tone shot[] = {{180, 60, 0.11, 30, 0.75, 0.2, 0.55}};       // your rifle: short noisy crack
+    const Tone enemy[] = {{240, 90, 0.10, 34, 0.80, 0.1, 0.35}};      // enemy rifle, a bit higher and quieter
+    const Tone hurt[] = {{320, 160, 0.12, 25, 0.25, 0.3, 0.45}};      // you took damage
 
     Sound base[static_cast<int>(Sfx::Count)];
     base[static_cast<int>(Sfx::Hit)] = MakeSound(hit, 1);
@@ -95,6 +98,9 @@ bool Audio::Init() {
     base[static_cast<int>(Sfx::CountBeep)] = MakeSound(beep, 1);
     base[static_cast<int>(Sfx::CountGo)] = MakeSound(go, 1);
     base[static_cast<int>(Sfx::UiClick)] = MakeSound(click, 1);
+    base[static_cast<int>(Sfx::Shot)] = MakeSound(shot, 1);
+    base[static_cast<int>(Sfx::EnemyShot)] = MakeSound(enemy, 1);
+    base[static_cast<int>(Sfx::Hurt)] = MakeSound(hurt, 1);
 
     for (int s = 0; s < static_cast<int>(Sfx::Count); ++s) {
         sounds_[s][0] = base[s];

@@ -1184,6 +1184,7 @@ std::unique_ptr<Mode> CreateMode(ModeId id, const GameContext& ctx) {
         case ModeId::Peek: return std::make_unique<PeekMode>(ctx);
         case ModeId::Placement: return std::make_unique<PlacementMode>(ctx);
         case ModeId::Sniper: return std::make_unique<SniperMode>(ctx);
+        case ModeId::VsBot: return CreateVsBotMode(ctx);
         case ModeId::Mixed: return std::make_unique<MixedMode>(ctx);
         default: return std::make_unique<GridshotMode>(ctx);
     }

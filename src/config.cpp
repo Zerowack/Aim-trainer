@@ -105,6 +105,7 @@ bool Config::Load(const std::string& path) {
     keys.scope = GetI(kv, "key_scope", keys.scope);
     scopedMult = ClampD(GetD(kv, "scoped_sens_multiplier", scopedMult), 0.01, 10.0);
     sniperWeapon = ClampI(GetI(kv, "sniper_weapon", sniperWeapon), 0, 2);
+    botTier = ClampI(GetI(kv, "bot_tier", botTier), 0, 8);
     scopeHold = GetB(kv, "scope_hold", scopeHold);
 
     auto it = kv.find("crosshair");
@@ -148,6 +149,7 @@ bool Config::Save(const std::string& path) const {
     out << "scoped_sens_multiplier=" << scopedMult << "\n";
     out << "sniper_weapon=" << sniperWeapon << "   # 0=marshal 1=outlaw 2=operator\n";
     out << "scope_hold=" << (scopeHold ? 1 : 0) << "\n";
+    out << "bot_tier=" << botTier << "   # VS Bot: 0=iron .. 8=radiant\n";
     out << "crosshair=" << EncodeCrosshair(crosshair) << "\n";
     return static_cast<bool>(out);
 }

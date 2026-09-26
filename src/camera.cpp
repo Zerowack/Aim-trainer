@@ -96,6 +96,7 @@ double AimHistory::Speed(double now, double window) const {
 // ValCamera
 
 void ValCamera::Reset(double yawDeg, double pitchDeg) {
+    eye_ = Vector3{0.0f, kEyeHeight, 0.0f};
     yaw_ = val::NormalizeDeg(yawDeg);
     pitch_ = pitchDeg;
 }
@@ -108,7 +109,7 @@ void ValCamera::ApplyCounts(long dx, long dy, double sens) {
     if (pitch_ < -val::kPitchLimit) pitch_ = -val::kPitchLimit;
 }
 
-Vector3 ValCamera::Eye() const { return Vector3{0.0f, kEyeHeight, 0.0f}; }
+Vector3 ValCamera::Eye() const { return eye_; }
 
 Vector3 ValCamera::Forward() const { return DirectionFromAngles(yaw_, pitch_); }
 

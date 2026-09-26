@@ -230,6 +230,7 @@ void App::Frame() {
         case Screen::Rank: ui::Backdrop(); ScreenRank(); break;
         case Screen::Difficulty: ui::Backdrop(); ScreenDifficulty(); break;
         case Screen::SniperSelect: ui::Backdrop(); ScreenSniperSelect(); break;
+        case Screen::BotSelect: ui::Backdrop(); ScreenBotSelect(); break;
     }
     if (screen_ != Screen::Playing) DrawFpsCounter();
 
@@ -273,14 +274,15 @@ void App::StartRun(ModeId id, bool finderTest) {
     ctx.weapon = static_cast<SniperWeapon>(cfg_.sniperWeapon);
     ctx.scopeBind = cfg_.keys.scope;
     ctx.scopeHold = cfg_.scopeHold;
+    ctx.botTier = cfg_.botTier;
 
     mode_.reset();  // destroy the old mode first (it may own world covers)
+    cam_.Reset(0.0, 0.0);  // before creating the mode: it may move the eye
+    history_.Clear();
+    fx_.Clear();
     mode_ = CreateMode(id, ctx);
     currentMode_ = id;
     finderRun_ = finderTest;
-    cam_.Reset(0.0, 0.0);
-    history_.Clear();
-    fx_.Clear();
     triggerHeld_ = false;
 
     clock_ = GameClock{};
@@ -291,6 +293,7 @@ void App::StartRun(ModeId id, bool finderTest) {
     live_ = false;
     paused_ = false;
     runLength_ = finderTest ? SensFinder::kTestSeconds : static_cast<double>(cfg_.runSeconds);
+    if (id == ModeId::VsBot) runLength_ = 3600.0;  // the match ends itself (first to 5 rounds)
     screen_ = Screen::Playing;
     ui::ClearFocus();
 }
@@ -304,7 +307,7 @@ void App::BeginLive(double gameTime) {
 
 void App::EndRun() {
     RunStats s = mode_->Stats();
-    s.duration = runLength_;
+    s.duration = std::min(runLength_, std::max(0.0, lastGameTime_ - runStart_));
     if (s.score < 0) s.score = 0;
     mode_.reset();
     live_ = false;
@@ -373,7 +376,8 @@ void App::UpdatePlaying(const std::vector<platform::RawEvent>& events, double no
         Pause();
         return;
     }
-    if (!finderRun_ && input::BindPressed(cfg_.keys.restart)) {
+    // (VS Bot uses R to reload, so restart is only in the pause menu there.)
+    if (!finderRun_ && currentMode_ != ModeId::VsBot && input::BindPressed(cfg_.keys.restart)) {
         StartRun(currentMode_, false);
         return;
     }
@@ -425,7 +429,7 @@ void App::UpdatePlaying(const std::vector<platform::RawEvent>& events, double no
 
     mode_->Update(g, dt, triggerHeld_);
     fx_.Update(dt);
-    if (g - runStart_ >= runLength_) EndRun();
+    if (g - runStart_ >= runLength_ || mode_->Finished()) EndRun();
 }
 
 // ===========================================================================
@@ -487,19 +491,22 @@ void App::DrawHud(double g) {
         const RunStats& s = mode_->Stats();
 
         // Timer with a progress bar; the last 5 seconds pulse red.
-        const double left = live_ ? std::max(0.0, runLength_ - (g - runStart_)) : runLength_;
+        double left = live_ ? std::max(0.0, runLength_ - (g - runStart_)) : runLength_;
+        double timerTotal = runLength_;
+        std::string timerLabel = ModeName(currentMode_);
+        if (mode_->HudTimer(g, left, timerLabel)) timerTotal = 60.0;  // e.g. VS Bot round timer
         const int secs = static_cast<int>(std::ceil(left));
         const bool finalSeconds = live_ && left <= 5.0 && left > 0.0;
         const Rectangle tb = {cx - 110.0f, 14.0f, 220.0f, 74.0f};
         Angled(tb, Alpha(theme::kBg, 0.78f), 14.0f);
-        const float frac = runLength_ > 0.0 ? static_cast<float>(left / runLength_) : 0.0f;
+        const float frac = timerTotal > 0.0 ? static_cast<float>(std::min(1.0, left / timerTotal)) : 0.0f;
         Fill(Rectangle{tb.x + 16.0f, tb.y + tb.height - 12.0f, tb.width - 32.0f, 3.0f}, Alpha(theme::kLine, 0.8f));
         Fill(Rectangle{tb.x + 16.0f, tb.y + tb.height - 12.0f, (tb.width - 32.0f) * frac, 3.0f},
              finalSeconds ? theme::kAccent : theme::kText);
         const bool blink = finalSeconds && std::fmod(left, 1.0) > 0.5;
         TextBold(TextFormat("%d:%02d", secs / 60, secs % 60), cx, 20.0f, 40.0f, blink ? theme::kAccent : theme::kText,
                  Align::Center);
-        Text(ModeName(currentMode_), cx, 96.0f, 17.0f, Alpha(theme::kTextDim, 0.9f), Align::Center);
+        Text(timerLabel, cx, 96.0f, 17.0f, Alpha(theme::kTextDim, 0.9f), Align::Center);
 
         // Score block (top right) with a red accent edge.
         const float rx = vw - 300.0f;

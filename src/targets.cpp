@@ -12,9 +12,15 @@ BoundingBox MakeBox(Vector3 c, Vector3 size) {
                        Vector3{c.x + size.x * 0.5f, c.y + size.y * 0.5f, c.z + size.z * 0.5f}};
 }
 
-Vector3 HeadCenter(const Target& t) { return Vector3{t.pos.x, t.pos.y + hitbox::kHeadCenterY, t.pos.z}; }
-Vector3 TorsoCenter(const Target& t) { return Vector3{t.pos.x, t.pos.y + hitbox::kTorsoCenterY, t.pos.z}; }
-Vector3 LegCenter(const Target& t) { return Vector3{t.pos.x, t.pos.y + hitbox::kLegHeight * 0.5f, t.pos.z}; }
+// Crouching shortens the legs (the torso and head drop with them).
+float LegHeight(const Target& t) { return hitbox::kLegHeight * (1.0f - 0.5f * t.crouch); }
+Vector3 HeadCenter(const Target& t) {
+    return Vector3{t.pos.x, t.pos.y + LegHeight(t) + hitbox::kTorsoHeight + hitbox::kNeckGap + hitbox::kHeadRadius, t.pos.z};
+}
+Vector3 TorsoCenter(const Target& t) {
+    return Vector3{t.pos.x, t.pos.y + LegHeight(t) + hitbox::kTorsoHeight * 0.5f, t.pos.z};
+}
+Vector3 LegCenter(const Target& t) { return Vector3{t.pos.x, t.pos.y + LegHeight(t) * 0.5f, t.pos.z}; }
 
 Color Mix(Color a, Color b, float k) {
     auto lerp = [k](unsigned char x, unsigned char y) {
@@ -38,11 +44,11 @@ TargetHit RaycastTarget(const Target& t, const Ray& ray) {
     const RayCollision torso = GetRayCollisionBox(
         ray, MakeBox(TorsoCenter(t), Vector3{hitbox::kTorsoWidth, hitbox::kTorsoHeight, hitbox::kTorsoDepth}));
     const RayCollision legs = GetRayCollisionBox(
-        ray, MakeBox(LegCenter(t), Vector3{hitbox::kLegWidth, hitbox::kLegHeight, hitbox::kLegDepth}));
+        ray, MakeBox(LegCenter(t), Vector3{hitbox::kLegWidth, LegHeight(t), hitbox::kLegDepth}));
     float best = 1e30f;
     if (head.hit && head.distance < best) { best = head.distance; result.hit = true; result.head = true; }
-    if (torso.hit && torso.distance < best) { best = torso.distance; result.hit = true; result.head = false; }
-    if (legs.hit && legs.distance < best) { best = legs.distance; result.hit = true; result.head = false; }
+    if (torso.hit && torso.distance < best) { best = torso.distance; result.hit = true; result.head = false; result.legs = false; }
+    if (legs.hit && legs.distance < best) { best = legs.distance; result.hit = true; result.head = false; result.legs = true; }
     result.distance = best;
     return result;
 }
@@ -72,7 +78,7 @@ void DrawTarget(const World& world, const Target& t, Color base) {
         return;
     }
     const Color body = Shade(c, 0.85f);
-    world.DrawBoxLit(LegCenter(t), Vector3{hitbox::kLegWidth, hitbox::kLegHeight, hitbox::kLegDepth}, Shade(c, 0.7f), Surface::Target);
+    world.DrawBoxLit(LegCenter(t), Vector3{hitbox::kLegWidth, LegHeight(t), hitbox::kLegDepth}, Shade(c, 0.7f), Surface::Target);
     world.DrawBoxLit(TorsoCenter(t), Vector3{hitbox::kTorsoWidth, hitbox::kTorsoHeight, hitbox::kTorsoDepth}, body, Surface::Target);
     world.DrawSphereLit(HeadCenter(t), hitbox::kHeadRadius, c);
 }
