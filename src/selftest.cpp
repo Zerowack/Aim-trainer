@@ -154,6 +154,10 @@ bool RunSelfTest(std::string& report) {
         c.True("valorant code: custom colour, dot, ADS section ignored",
                vok2 && v.r == 255 && v.g == 128 && v.b == 0 && v.centerDot && v.dotThickness == 3 && v.innerThickness == 1 &&
                    v.innerLength == 6 && v.outerShow);
+        const bool vok3 = DecodeAnyCrosshair("0;P;d;1;f;0;0t;4;0l;1;0o;0;0a;1;0f;0;1b;0", v, &err);
+        c.True("valorant code: white dot + short thick inner lines at offset 0",
+               vok3 && v.r == 255 && v.g == 255 && v.b == 255 && v.centerDot && v.innerThickness == 4 &&
+                   v.innerLength == 1 && v.innerOffset == 0 && v.innerOpacity > 0.99f && !v.outerShow && v.outline);
         c.True("valorant code rejects missing P section", !DecodeValorantCrosshair("0;A;c;1", v, &err));
     }
 

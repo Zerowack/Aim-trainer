@@ -26,16 +26,14 @@ struct Piece {
 void AddLines(std::vector<Piece>& out, int cx, int cy, int length, int thickness, int offset,
               unsigned char alpha) {
     if (length <= 0 || thickness <= 0) return;
-    // The centre "block" (where the lines would meet) spans
-    // [c - half, c - half + thickness) on each axis, so odd and even
-    // thicknesses both stay symmetric around the centre pixel.
-    const int half = thickness / 2;
-    const int lo = -half;              // first pixel of the centre block
-    const int hi = -half + thickness;  // one past the last pixel
-    out.push_back({cx + hi + offset, cy + lo, length, thickness, alpha});           // right
-    out.push_back({cx + lo - offset - length, cy + lo, length, thickness, alpha});  // left
-    out.push_back({cx + lo, cy + hi + offset, thickness, length, alpha});           // down
-    out.push_back({cx + lo, cy + lo - offset - length, thickness, length, alpha});  // up
+    // Like Valorant, the offset is measured from the exact centre of the
+    // screen: with offset 0 the four lines meet in the middle. Across the
+    // line, the thickness is centred on the centre pixel.
+    const int across = -(thickness / 2);  // first pixel across the line
+    out.push_back({cx + offset, cy + across, length, thickness, alpha});           // right
+    out.push_back({cx - offset - length, cy + across, length, thickness, alpha});  // left
+    out.push_back({cx + across, cy + offset, thickness, length, alpha});           // down
+    out.push_back({cx + across, cy - offset - length, thickness, length, alpha});  // up
 }
 
 std::string Lower(std::string s) {
@@ -291,15 +289,74 @@ void DrawCrosshair(const Crosshair& cIn, int cx, int cy, int scale) {
         const int half = t / 2;
         pieces.push_back({cx - half, cy - half, t, t, AlphaFrom(c.dotOpacity)});
     }
+    if (pieces.empty()) return;
 
-    if (c.outline) {
-        const int o = c.outlineThickness * scale;
-        const unsigned char oa = AlphaFrom(c.outlineOpacity);
-        for (const Piece& p : pieces) {
-            DrawRectangle(p.x - o, p.y - o, p.w + 2 * o, p.h + 2 * o, Color{0, 0, 0, oa});
+    // Rasterise into a small pixel buffer so overlapping pieces are merged:
+    // each pixel gets the strongest opacity of the pieces covering it, and
+    // the outline is drawn once around the combined shape (like Valorant),
+    // instead of darker spots where pieces overlap.
+    const int o = c.outline ? c.outlineThickness * scale : 0;
+    int x0 = pieces[0].x, y0 = pieces[0].y, x1 = x0, y1 = y0;
+    for (const Piece& p : pieces) {
+        x0 = std::min(x0, p.x);
+        y0 = std::min(y0, p.y);
+        x1 = std::max(x1, p.x + p.w);
+        y1 = std::max(y1, p.y + p.h);
+    }
+    x0 -= o;
+    y0 -= o;
+    x1 += o;
+    y1 += o;
+    const int W = x1 - x0, H = y1 - y0;
+    if (W <= 0 || H <= 0) return;
+    const auto idx = [W](int x, int y) { return static_cast<size_t>(y) * static_cast<size_t>(W) + static_cast<size_t>(x); };
+
+    std::vector<unsigned char> fill(static_cast<size_t>(W) * static_cast<size_t>(H), 0);
+    for (const Piece& p : pieces) {
+        for (int y = p.y; y < p.y + p.h; ++y) {
+            for (int x = p.x; x < p.x + p.w; ++x) {
+                unsigned char& a = fill[idx(x - x0, y - y0)];
+                a = std::max(a, p.alpha);
+            }
         }
     }
-    for (const Piece& p : pieces) {
-        DrawRectangle(p.x, p.y, p.w, p.h, Color{c.r, c.g, c.b, p.alpha});
+
+    // Draws horizontal runs of pixels where 'value(x, y)' is non-zero and equal.
+    auto drawRuns = [&](const std::vector<unsigned char>& buf, Color col) {
+        for (int y = 0; y < H; ++y) {
+            int x = 0;
+            while (x < W) {
+                const unsigned char a = buf[idx(x, y)];
+                if (a == 0) {
+                    ++x;
+                    continue;
+                }
+                int end = x + 1;
+                while (end < W && buf[idx(end, y)] == a) ++end;
+                DrawRectangle(x0 + x, y0 + y, end - x, 1, Color{col.r, col.g, col.b, a});
+                x = end;
+            }
+        }
+    };
+
+    if (o > 0) {
+        // Outline = shape grown by 'o' pixels (square dilation, done as a
+        // horizontal pass then a vertical pass).
+        std::vector<unsigned char> grownX(fill.size(), 0), outline(fill.size(), 0);
+        for (int y = 0; y < H; ++y) {
+            for (int x = 0; x < W; ++x) {
+                if (fill[idx(x, y)] == 0) continue;
+                for (int k = std::max(0, x - o); k <= std::min(W - 1, x + o); ++k) grownX[idx(k, y)] = 1;
+            }
+        }
+        const unsigned char oa = AlphaFrom(c.outlineOpacity);
+        for (int x = 0; x < W; ++x) {
+            for (int y = 0; y < H; ++y) {
+                if (grownX[idx(x, y)] == 0) continue;
+                for (int k = std::max(0, y - o); k <= std::min(H - 1, y + o); ++k) outline[idx(x, k)] = oa;
+            }
+        }
+        drawRuns(outline, Color{0, 0, 0, 255});
     }
+    drawRuns(fill, Color{c.r, c.g, c.b, 255});
 }
