@@ -64,6 +64,16 @@ bool HasFocus();
 bool ConsumeFocusLost();
 // Lets the taskbar button / Win+Down minimize the window in every display mode.
 void AllowMinimize();
+
+// What is in the foreground right now.
+enum class Foreground { None, Us, CaptureTool, Other };
+// CaptureTool = Snipping Tool / Win+Shift+S, ShareX, Lightshot, Game Bar, ...
+Foreground ForegroundKind();
+
+// Copies an RGBA8 image to the clipboard (as a bitmap).
+bool CopyImageToClipboard(const unsigned char* rgba, int width, int height);
+// Runs fn(arg) on a short-lived background thread.
+void RunInBackground(void (*fn)(void*), void* arg);
 bool QuitRequested();
 
 // Forces the OpenGL swap interval (0 = vsync off) via wglSwapIntervalEXT.

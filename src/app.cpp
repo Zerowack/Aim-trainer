@@ -7,6 +7,7 @@
 
 #include "crosshair.h"
 #include "input.h"
+#include "rlgl.h"
 #include "selftest.h"
 #include "ui.h"
 
@@ -177,8 +178,26 @@ void App::Frame() {
     }
 
     // 2) Focus loss (alt-tab, Windows key, popups): pause and free the cursor.
-    if (platform::ConsumeFocusLost() || !platform::HasFocus()) {
+    const bool focusLost = platform::ConsumeFocusLost();
+    if (focusLost || !platform::HasFocus()) {
         if (screen_ == Screen::Playing && !paused_) Pause();
+        // Exclusive fullscreen: get out of the way like other games do, so the
+        // Windows key / Alt-Tab show the desktop and other apps. (raylib turns
+        // GLFW's auto-minimize off.) Clicking the taskbar button brings it back.
+        // (Decided over the next frames, once we know which window took focus:
+        // screenshot tools like Win+Shift+S must not minimize the game.)
+        if (focusLost && cfg_.displayMode == DisplayMode::Fullscreen && IsWindowFullscreen() && !IsWindowMinimized()) {
+            minimizeDecideUntil_ = now + 0.4;
+        }
+    }
+    if (minimizeDecideUntil_ > 0.0) {
+        const platform::Foreground fg = platform::ForegroundKind();
+        if (fg == platform::Foreground::Us || fg == platform::Foreground::CaptureTool || IsWindowMinimized()) {
+            minimizeDecideUntil_ = 0.0;
+        } else if (fg == platform::Foreground::Other || now > minimizeDecideUntil_) {
+            minimizeDecideUntil_ = 0.0;
+            MinimizeWindow();
+        }
     }
 
     std::vector<platform::RawEvent> events;
@@ -186,6 +205,7 @@ void App::Frame() {
 
     ui::BeginFrame();
 
+    if (!ui::AnyTextBoxFocused() && rebinding_ < 0 && input::BindPressed(cfg_.keys.screenshot)) screenshotRequested_ = true;
     if (!ui::AnyTextBoxFocused() && rebinding_ < 0 && input::BindPressed(cfg_.keys.toggleFps)) {
         cfg_.showFps = !cfg_.showFps;
     }
@@ -235,6 +255,21 @@ void App::Frame() {
         case Screen::BotSelect: ui::Backdrop(); ScreenBotSelect(); break;
     }
     if (screen_ != Screen::Playing) DrawFpsCounter();
+
+    // Screenshot: read the finished frame from the back buffer before it is
+    // shown (so it is exactly what you see), then draw the notice on top.
+    if (screenshotRequested_) {
+        screenshotRequested_ = false;
+        TakeScreenshotNow();
+    }
+    if (platform::Now() < screenshotToastUntil_) {
+        using namespace ui;
+        const float w = TextWidth(screenshotToast_, 18.0f) + 40.0f;
+        const Rectangle r = {VW() * 0.5f - w * 0.5f, 16.0f, w, 40.0f};
+        Angled(r, Alpha(theme::kBg, 0.9f), 10.0f);
+        Fill(Rectangle{r.x, r.y, 4.0f, r.height}, theme::kGood);
+        Text(screenshotToast_, r.x + 20.0f, r.y + 10.0f, 18.0f, theme::kText);
+    }
 
     EndDrawing();
 
@@ -493,6 +528,42 @@ void App::DrawPlaying() {
     if (paused_) DrawPauseMenu();
 }
 
+namespace {
+struct ScreenshotJob {
+    Image image;
+    std::string path;
+};
+void SaveScreenshotJob(void* p) {
+    ScreenshotJob* job = static_cast<ScreenshotJob*>(p);
+    ExportImage(job->image, job->path.c_str());
+    UnloadImage(job->image);
+    delete job;
+}
+}  // namespace
+
+void App::TakeScreenshotNow() {
+    rlDrawRenderBatchActive();  // flush queued 2D draws so the read-back has everything
+    Image img = LoadImageFromScreen();
+    if (!img.data) return;
+    ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    const bool copied = platform::CopyImageToClipboard(static_cast<const unsigned char*>(img.data), img.width, img.height);
+    // Save the PNG on a background thread: encoding takes ~100 ms and would
+    // otherwise freeze the game for a moment.
+    const std::string dir = DataDir() + "Screenshots";
+    if (!DirectoryExists(dir.c_str())) MakeDirectory(dir.c_str());
+    std::string stamp = NowTimestamp();
+    for (char& c : stamp) {
+        if (c == ' ') c = '_';
+        if (c == ':') c = '-';
+    }
+    const std::string file = "Valtrainer_" + stamp + ".png";
+    platform::RunInBackground(&SaveScreenshotJob, new ScreenshotJob{img, dir + "/" + file});
+    screenshotToast_ = copied ? "SCREENSHOT COPIED  -  paste it anywhere (also saved to Screenshots\\" + file + ")"
+                              : "SCREENSHOT SAVED to Screenshots\\" + file;
+    screenshotToastUntil_ = platform::Now() + 2.5;
+    audio_.Play(Sfx::UiClick);
+}
+
 void App::DrawFpsCounter() {
     if (!cfg_.showFps) return;
     const std::string s = TextFormat("%.0f FPS  %.2f ms  (max %.1f)", fpsShown_, frameMsShown_, worstMsShown_);
@@ -554,7 +625,7 @@ void App::DrawHud(double g) {
         Fill(Rectangle{sb.x, sb.y, 4.0f, sb.height - 14.0f}, theme::kAccent);
         TextBold(TextFormat("%lld", std::max<long long>(0, s.score)), rx + 270.0f, 20.0f, 40.0f, theme::kText, Align::Right);
         Text("SCORE", rx + 18.0f, 32.0f, 18.0f, theme::kAccent);
-        if (currentMode_ == ModeId::Tracking) {
+        if (IsTrackingMode(currentMode_)) {
             Text(TextFormat("ON TARGET %.0f%%", (s.TrackingPct() > 0 ? s.TrackingPct() : 0.0) * 100.0), rx + 18.0f, 80.0f,
                  20.0f, theme::kTextDim);
         } else {

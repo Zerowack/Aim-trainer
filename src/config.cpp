@@ -61,6 +61,7 @@ Config::Config() {
     keys.crouch = KEY_LEFT_CONTROL;
     keys.jump = KEY_SPACE;
     keys.reload = KEY_R;
+    keys.screenshot = KEY_F12;
 }
 
 int Config::FpsCap() const {
@@ -88,6 +89,10 @@ bool Config::Load(const std::string& path) {
     autoSens = GetB(kv, "auto_sens", autoSens);
 
     displayMode = static_cast<DisplayMode>(ClampI(GetI(kv, "display_mode", static_cast<int>(displayMode)), 0, 2));
+    // One-time move from exclusive fullscreen (the old default) to borderless,
+    // which streams, screenshots and Alt-Tabs properly. Pick Fullscreen again
+    // in Settings > Video to keep it.
+    if (kv.find("display_v2") == kv.end() && displayMode == DisplayMode::Fullscreen) displayMode = DisplayMode::Borderless;
     windowWidth = ClampI(GetI(kv, "window_width", windowWidth), 640, 7680);
     windowHeight = ClampI(GetI(kv, "window_height", windowHeight), 360, 4320);
     fpsCapIndex = ClampI(GetI(kv, "fps_cap_index", fpsCapIndex), 0, kFpsCapCount - 1);
@@ -119,6 +124,7 @@ bool Config::Load(const std::string& path) {
     keys.crouch = GetI(kv, "key_crouch", keys.crouch);
     keys.jump = GetI(kv, "key_jump", keys.jump);
     keys.reload = GetI(kv, "key_reload", keys.reload);
+    keys.screenshot = GetI(kv, "key_screenshot", keys.screenshot);
     scopedMult = ClampD(GetD(kv, "scoped_sens_multiplier", scopedMult), 0.01, 10.0);
     sniperWeapon = ClampI(GetI(kv, "sniper_weapon", sniperWeapon), 0, 2);
     botTier = ClampI(GetI(kv, "bot_tier", botTier), 0, 8);
@@ -142,6 +148,7 @@ bool Config::Save(const std::string& path) const {
     out << "sens=" << sens << "\n";
     out << "auto_sens=" << (autoSens ? 1 : 0) << "\n";
     out << "display_mode=" << static_cast<int>(displayMode) << "   # 0=fullscreen 1=borderless 2=windowed\n";
+    out << "display_v2=1\n";
     out << "window_width=" << windowWidth << "\n";
     out << "window_height=" << windowHeight << "\n";
     out << "fps_cap_index=" << fpsCapIndex << "   # 0=uncapped 1=144 2=240 3=360 4=custom\n";
@@ -170,6 +177,7 @@ bool Config::Save(const std::string& path) const {
     out << "key_crouch=" << keys.crouch << "\n";
     out << "key_jump=" << keys.jump << "\n";
     out << "key_reload=" << keys.reload << "\n";
+    out << "key_screenshot=" << keys.screenshot << "\n";
     out << "scoped_sens_multiplier=" << scopedMult << "\n";
     out << "sniper_weapon=" << sniperWeapon << "   # 0=marshal 1=outlaw 2=operator\n";
     out << "scope_hold=" << (scopeHold ? 1 : 0) << "\n";

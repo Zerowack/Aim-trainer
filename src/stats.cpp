@@ -54,6 +54,16 @@ const char* ModeName(ModeId m) {
         case ModeId::Placement: return "Crosshair Placement";
         case ModeId::Sniper: return "Sniper";
         case ModeId::VsBot: return "VS Bot";
+        case ModeId::Headshot: return "Headshot";
+        case ModeId::Sixshot: return "Sixshot";
+        case ModeId::Spidershot: return "Spidershot";
+        case ModeId::Motionshot: return "Motionshot";
+        case ModeId::SmoothTrack: return "Smooth Tracking";
+        case ModeId::StrafeTap: return "Strafe Tap";
+        case ModeId::TargetSwitch: return "Target Switch";
+        case ModeId::LongRange: return "Long Range";
+        case ModeId::Microflex: return "Microflex";
+        case ModeId::Popcorn: return "Popcorn";
         case ModeId::Mixed: return "Sens Finder Test";
         default: return "?";
     }
@@ -62,6 +72,11 @@ const char* ModeName(ModeId m) {
 const char* ModeShortName(ModeId m) {
     if (m == ModeId::Placement) return "Placement";
     if (m == ModeId::Peek) return "Peek";
+    if (m == ModeId::SmoothTrack) return "Smooth";
+    if (m == ModeId::TargetSwitch) return "Switch";
+    if (m == ModeId::LongRange) return "Long";
+    if (m == ModeId::Spidershot) return "Spider";
+    if (m == ModeId::Motionshot) return "Motion";
     return ModeName(m);
 }
 
@@ -76,6 +91,16 @@ const char* ModeKey(ModeId m) {
         case ModeId::Placement: return "placement";
         case ModeId::Sniper: return "sniper";
         case ModeId::VsBot: return "vsbot";
+        case ModeId::Headshot: return "headshot";
+        case ModeId::Sixshot: return "sixshot";
+        case ModeId::Spidershot: return "spidershot";
+        case ModeId::Motionshot: return "motionshot";
+        case ModeId::SmoothTrack: return "smoothtrack";
+        case ModeId::StrafeTap: return "strafetap";
+        case ModeId::TargetSwitch: return "targetswitch";
+        case ModeId::LongRange: return "longrange";
+        case ModeId::Microflex: return "microflex";
+        case ModeId::Popcorn: return "popcorn";
         case ModeId::Mixed: return "mixed";
         default: return "unknown";
     }
@@ -92,9 +117,79 @@ const char* ModeDescription(ModeId m) {
         case ModeId::Placement: return "Keep your crosshair at head level on the angles. Scored on pre-aim.";
         case ModeId::Sniper: return "Hold a long angle like C long. Enemies swing, jump and crouch peek. Stop to shoot.";
         case ModeId::VsBot: return "1v1 duel against a bot from Iron to Radiant. Move, crouch, counter-strafe, first to 5.";
+        case ModeId::Headshot: return "Agents appear around you. Only headshots count - body shots are misses.";
+        case ModeId::Sixshot: return "Six small targets on a wall. Destroy one and another appears. Fast small flicks.";
+        case ModeId::Spidershot: return "Flick out to a target, then back to the centre. Repeat. Flick + reset.";
+        case ModeId::Motionshot: return "Three targets drift across the wall. Click them while they move.";
+        case ModeId::SmoothTrack: return "Hold fire on a target moving in smooth curves. Pure tracking control.";
+        case ModeId::StrafeTap: return "One-tap the head of an agent doing ADAD strafes. Only headshots count.";
+        case ModeId::TargetSwitch: return "Three strafing agents. Track one until it dies, switch to the next.";
+        case ModeId::LongRange: return "Tiny targets 30-45 m away. Slow down and land the precise click.";
+        case ModeId::Microflex: return "Tiny targets pop up right next to your crosshair. Micro-adjustments.";
+        case ModeId::Popcorn: return "Targets are thrown into the air and fall. Hit them before they land.";
         case ModeId::Mixed: return "20 s of flicks, tracking and micro-adjustments.";
         default: return "";
     }
+}
+
+ModeCategory CategoryOf(ModeId m) {
+    switch (m) {
+        case ModeId::Gridshot:
+        case ModeId::Flick180:
+        case ModeId::Sixshot:
+        case ModeId::Spidershot:
+        case ModeId::Motionshot:
+        case ModeId::Popcorn: return ModeCategory::Flicking;
+        case ModeId::Microshot:
+        case ModeId::Headshot:
+        case ModeId::StrafeTap:
+        case ModeId::LongRange:
+        case ModeId::Microflex: return ModeCategory::Precision;
+        case ModeId::Tracking:
+        case ModeId::SmoothTrack:
+        case ModeId::TargetSwitch: return ModeCategory::Tracking;
+        case ModeId::Reaction: return ModeCategory::Reaction;
+        default: return ModeCategory::Valorant;
+    }
+}
+
+const char* CategoryName(ModeCategory c) {
+    switch (c) {
+        case ModeCategory::Flicking: return "Flicking";
+        case ModeCategory::Precision: return "Precision";
+        case ModeCategory::Tracking: return "Tracking";
+        case ModeCategory::Reaction: return "Reaction";
+        default: return "Valorant";
+    }
+}
+
+const char* ModeTags(ModeId m) {
+    switch (m) {
+        case ModeId::Gridshot: return "click speed grid static wall warmup";
+        case ModeId::Microshot: return "micro small precision one bullet head";
+        case ModeId::Tracking: return "track strafe adad agent hold fire";
+        case ModeId::Flick180: return "flick turn behind 180 big";
+        case ModeId::Reaction: return "reflex ms time click fast";
+        case ModeId::Peek: return "peek cover angle hold headshot";
+        case ModeId::Placement: return "crosshair placement pre aim head level";
+        case ModeId::Sniper: return "operator op marshal outlaw scope awp peek angle";
+        case ModeId::VsBot: return "bot duel 1v1 sheriff skirmish movement counter strafe";
+        case ModeId::Headshot: return "head only agents one tap click";
+        case ModeId::Sixshot: return "six small click speed wall grid";
+        case ModeId::Spidershot: return "spider flick centre center reset";
+        case ModeId::Motionshot: return "moving targets click motion";
+        case ModeId::SmoothTrack: return "smooth track tracking sphere curve smoothbot";
+        case ModeId::StrafeTap: return "strafe adad one tap head click agent";
+        case ModeId::TargetSwitch: return "switch switching tracking multiple agents";
+        case ModeId::LongRange: return "long range far tiny precision sniper";
+        case ModeId::Microflex: return "micro flex small close adjust";
+        case ModeId::Popcorn: return "popcorn air falling vertical moving";
+        default: return "";
+    }
+}
+
+bool IsTrackingMode(ModeId m) {
+    return m == ModeId::Tracking || m == ModeId::SmoothTrack || m == ModeId::TargetSwitch;
 }
 
 bool ModeFromKey(const std::string& key, ModeId& out) {
@@ -108,7 +203,7 @@ bool ModeFromKey(const std::string& key, ModeId& out) {
 }
 
 double RunStats::Accuracy() const {
-    if (mode == ModeId::Tracking) return trackHeldTime > 0.0 ? trackOnTime / trackHeldTime : 0.0;
+    if (IsTrackingMode(mode)) return trackHeldTime > 0.0 ? trackOnTime / trackHeldTime : 0.0;
     return shots > 0 ? static_cast<double>(hits) / shots : 0.0;
 }
 
@@ -229,7 +324,7 @@ std::vector<std::string> BuildTips(const RunStats& s, double sens) {
     }
 
     // 2) Accuracy vs speed trade-off.
-    if (s.mode != ModeId::Tracking && s.shots >= 5) {
+    if (!IsTrackingMode(s.mode) && s.shots >= 5) {
         const double acc = s.Accuracy();
         const double ttk = s.AvgTtkMs();
         if (acc < 0.6) {

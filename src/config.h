@@ -31,6 +31,7 @@ struct Keybinds {
     int crouch;
     int jump;
     int reload;    // VS Bot
+    int screenshot;
 };
 
 struct Config {
@@ -45,7 +46,9 @@ struct Config {
     bool autoSens = false;
 
     // Video
-    DisplayMode displayMode = DisplayMode::Fullscreen;
+    // Borderless by default: exclusive fullscreen can't be captured by Discord /
+    // OBS window capture or screenshot tools, and Alt-Tab switches the display mode.
+    DisplayMode displayMode = DisplayMode::Borderless;
     int windowWidth = 1600;
     int windowHeight = 900;
     int fpsCapIndex = 0;      // uncapped by default

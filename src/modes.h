@@ -144,6 +144,8 @@ protected:
     virtual void OnTargetPresented(Target& target, double t);
     // Start time for time-to-kill of 'target'.
     virtual double TtkStart(const Target& target) const;
+    // Does this hit count? (Headshot-only modes reject body hits: they are misses.)
+    virtual bool CountsAsHit(const TargetHit& /*hit*/) const { return true; }
     // Aim at the head of humanoids (for shot analysis).
     virtual bool AimHead() const { return false; }
     // The ray a shot travels along (snipers add unscoped spread).
@@ -189,3 +191,4 @@ protected:
 std::unique_ptr<Mode> CreateMode(ModeId id, const GameContext& ctx);
 std::unique_ptr<Mode> CreateVsBotMode(const GameContext& ctx);   // vsbot.cpp
 std::unique_ptr<Mode> CreateSniperMode(const GameContext& ctx);  // sniper.cpp
+std::unique_ptr<Mode> CreateExtraMode(ModeId id, const GameContext& ctx);  // modes_extra.cpp (classic scenarios)

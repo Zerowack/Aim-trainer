@@ -36,7 +36,12 @@ include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
-set(CUSTOMIZE_BUILD OFF CACHE BOOL "" FORCE)
+# Custom raylib build: identical to the defaults except that raylib's own
+# F12 screenshot / Ctrl+F12 GIF capture are off (they saved a stale frame and
+# froze the game while writing the PNG). Valtrainer has its own screenshot key.
+set(CUSTOMIZE_BUILD ON CACHE BOOL "" FORCE)
+set(SUPPORT_SCREEN_CAPTURE OFF CACHE BOOL "" FORCE)
+set(SUPPORT_GIF_RECORDING OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     raylib
     URL https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz
@@ -77,6 +82,7 @@ add_executable(Valtrainer WIN32
     src/vsbot.cpp
     src/movement.cpp
     src/sniper.cpp
+    src/modes_extra.cpp
     src/platform.h
     src/platform_win32.cpp
     src/rank.cpp

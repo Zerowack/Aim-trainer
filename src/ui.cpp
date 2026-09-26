@@ -480,6 +480,11 @@ bool TextBox(Rectangle r, int id, std::string* text, size_t maxLen, bool numeric
     return changed;
 }
 
+void FocusTextBox(int id) {
+    g_focusedBox = id;
+    g_selectAll = false;
+}
+
 bool AnyTextBoxFocused() { return g_focusedBox >= 0; }
 
 void ClearFocus() {

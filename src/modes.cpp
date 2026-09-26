@@ -90,7 +90,7 @@ void Mode::OnShot(double t) {
     for (size_t i = 0; i < targets_.size(); ++i) {
         if (!targets_[i].presented) continue;  // cannot shoot what was never on screen
         const TargetHit h = RaycastTarget(targets_[i], ray);
-        if (h.hit && h.distance < coverDist && (best < 0 || h.distance < bestHit.distance)) {
+        if (h.hit && CountsAsHit(h) && h.distance < coverDist && (best < 0 || h.distance < bestHit.distance)) {
             best = static_cast<int>(i);
             bestHit = h;
         }
@@ -1015,6 +1015,16 @@ std::unique_ptr<Mode> CreateMode(ModeId id, const GameContext& ctx) {
         case ModeId::Sniper: return CreateSniperMode(ctx);
         case ModeId::VsBot: return CreateVsBotMode(ctx);
         case ModeId::Mixed: return std::make_unique<MixedMode>(ctx);
+        case ModeId::Headshot:
+        case ModeId::Sixshot:
+        case ModeId::Spidershot:
+        case ModeId::Motionshot:
+        case ModeId::SmoothTrack:
+        case ModeId::StrafeTap:
+        case ModeId::TargetSwitch:
+        case ModeId::LongRange:
+        case ModeId::Microflex:
+        case ModeId::Popcorn: return CreateExtraMode(id, ctx);
         default: return std::make_unique<GridshotMode>(ctx);
     }
 }

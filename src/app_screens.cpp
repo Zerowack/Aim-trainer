@@ -1,5 +1,6 @@
 // app_screens.cpp - menus, results, settings, stats and sens finder screens.
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -122,6 +123,82 @@ void DrawModeIcon(ModeId m, float cx, float cy, float s, Color c) {
             Line(Vector2{cx - s * 0.34f, cy}, Vector2{cx - s * 0.28f, cy}, t, c);
             Line(Vector2{cx - s * 0.12f, cy}, Vector2{cx - s * 0.06f, cy}, t, c);
             break;
+        case ModeId::Headshot:
+        case ModeId::StrafeTap:
+            // Agent with a crosshair on the head (Strafe Tap adds arrows).
+            Circle(Vector2{cx, cy - s * 0.26f}, s * 0.12f, c);
+            Fill(Rectangle{cx - s * 0.12f, cy - s * 0.1f, s * 0.24f, s * 0.52f}, Alpha(c, 0.55f));
+            CircleLines(Vector2{cx, cy - s * 0.26f}, s * 0.2f, 2.0f, theme::kAccent);
+            if (m == ModeId::StrafeTap) {
+                Tri(Vector2{cx - s * 0.5f, cy + s * 0.1f}, Vector2{cx - s * 0.3f, cy - s * 0.02f}, Vector2{cx - s * 0.3f, cy + s * 0.22f}, Alpha(c, 0.7f));
+                Tri(Vector2{cx + s * 0.5f, cy + s * 0.1f}, Vector2{cx + s * 0.3f, cy - s * 0.02f}, Vector2{cx + s * 0.3f, cy + s * 0.22f}, Alpha(c, 0.7f));
+            }
+            break;
+        case ModeId::Sixshot:
+            for (int i = 0; i < 6; ++i) {
+                const float px = cx + (static_cast<float>(i % 3) - 1.0f) * s * 0.32f;
+                const float py = cy + (static_cast<float>(i / 3) - 0.5f) * s * 0.4f;
+                Circle(Vector2{px, py}, s * 0.08f, c);
+            }
+            break;
+        case ModeId::Spidershot:
+            Circle(Vector2{cx, cy}, s * 0.1f, c);
+            for (int i = 0; i < 4; ++i) {
+                const float a = 0.785f + 1.571f * static_cast<float>(i);
+                const Vector2 p = {cx + std::cos(a) * s * 0.42f, cy + std::sin(a) * s * 0.42f};
+                Line(Vector2{cx, cy}, p, 2.0f, Alpha(c, 0.45f));
+                Circle(p, s * 0.07f, Alpha(c, 0.8f));
+            }
+            break;
+        case ModeId::Motionshot:
+            Circle(Vector2{cx + s * 0.15f, cy}, s * 0.16f, c);
+            for (int i = 0; i < 3; ++i) {
+                const float y = cy + (static_cast<float>(i) - 1.0f) * s * 0.12f;
+                Line(Vector2{cx - s * 0.5f, y}, Vector2{cx - s * 0.1f, y}, 2.0f, Alpha(c, 0.5f));
+            }
+            break;
+        case ModeId::SmoothTrack: {
+            Vector2 prev = {cx - s * 0.5f, cy};
+            for (int i = 1; i <= 16; ++i) {
+                const float x = cx - s * 0.5f + s * static_cast<float>(i) / 16.0f;
+                const Vector2 p = {x, cy + std::sin(static_cast<float>(i) * 0.4f) * s * 0.25f};
+                Line(prev, p, t, Alpha(c, 0.6f));
+                prev = p;
+            }
+            Circle(prev, s * 0.11f, c);
+            break;
+        }
+        case ModeId::TargetSwitch:
+            for (int i = 0; i < 3; ++i) {
+                const float x = cx + (static_cast<float>(i) - 1.0f) * s * 0.34f;
+                Circle(Vector2{x, cy - s * 0.2f}, s * 0.08f, i == 1 ? theme::kAccent : c);
+                Fill(Rectangle{x - s * 0.08f, cy - s * 0.1f, s * 0.16f, s * 0.36f}, i == 1 ? theme::kAccent : Alpha(c, 0.6f));
+            }
+            break;
+        case ModeId::LongRange:
+            Line(Vector2{cx - s * 0.5f, cy + s * 0.4f}, Vector2{cx - s * 0.04f, cy - s * 0.1f}, 2.0f, Alpha(c, 0.4f));
+            Line(Vector2{cx + s * 0.5f, cy + s * 0.4f}, Vector2{cx + s * 0.04f, cy - s * 0.1f}, 2.0f, Alpha(c, 0.4f));
+            Circle(Vector2{cx, cy - s * 0.18f}, s * 0.05f, c);
+            CircleLines(Vector2{cx, cy - s * 0.18f}, s * 0.14f, 2.0f, Alpha(c, 0.7f));
+            break;
+        case ModeId::Microflex:
+            Line(Vector2{cx - s * 0.4f, cy}, Vector2{cx - s * 0.12f, cy}, t, Alpha(c, 0.6f));
+            Line(Vector2{cx + s * 0.12f, cy}, Vector2{cx + s * 0.4f, cy}, t, Alpha(c, 0.6f));
+            Line(Vector2{cx, cy - s * 0.4f}, Vector2{cx, cy - s * 0.12f}, t, Alpha(c, 0.6f));
+            Line(Vector2{cx, cy + s * 0.12f}, Vector2{cx, cy + s * 0.4f}, t, Alpha(c, 0.6f));
+            Circle(Vector2{cx + s * 0.18f, cy - s * 0.2f}, s * 0.06f, c);
+            break;
+        case ModeId::Popcorn: {
+            Vector2 prev = {cx - s * 0.45f, cy + s * 0.4f};
+            for (int i = 1; i <= 14; ++i) {
+                const float k = static_cast<float>(i) / 14.0f;
+                const Vector2 p = {cx - s * 0.45f + k * s * 0.9f, cy + s * 0.4f - 4.0f * k * (1.0f - k) * s * 0.75f};
+                Line(prev, p, 2.0f, Alpha(c, 0.5f));
+                prev = p;
+            }
+            Circle(Vector2{cx - s * 0.1f, cy - s * 0.3f}, s * 0.11f, c);
+            break;
+        }
         default:
             break;
     }
@@ -227,13 +304,92 @@ void App::ScreenMainMenu() {
          theme::kTextDim);
     Text(TextFormat("v%s", kAppVersion), x0 + kContentWidth, VH() - 40.0f, 18.0f, Alpha(theme::kTextDim, 0.7f), Align::Right);
 
-    // Mode cards: 3 columns x 3 rows.
+    // Mode browser: search box + category chips + a scrollable grid of cards.
     const float gridW = 968.0f, gap = 12.0f;
-    const float cw = (gridW - 2.0f * gap) / 3.0f, ch = 172.0f;
+    const float cw = (gridW - 2.0f * gap) / 3.0f, ch = 160.0f;
+    const Rectangle searchR = {x0, 166.0f, 330.0f, 44.0f};
+    constexpr int kSearchId = 900;
+    // Start typing anywhere on the menu to search.
+    if (!AnyTextBoxFocused()) {
+        int c = GetCharPressed();
+        if (c > 32 && c < 127) {
+            FocusTextBox(kSearchId);
+            modeSearch_.push_back(static_cast<char>(c));
+            menuScroll_ = 0.0f;
+        }
+        while (c > 0) c = GetCharPressed();
+    }
+    const std::string before = modeSearch_;
+    TextBox(searchR, kSearchId, &modeSearch_, 32, false);
+    if (modeSearch_ != before) menuScroll_ = 0.0f;
+    if (modeSearch_.empty()) {
+        Text("Search modes... (just type)", searchR.x + 14.0f, searchR.y + 12.0f, 19.0f, Alpha(theme::kTextDim, 0.7f));
+    } else if (Button(Rectangle{searchR.x + searchR.width - 40.0f, searchR.y + 6.0f, 32.0f, 32.0f}, "x")) {
+        modeSearch_.clear();
+        ClearFocus();
+    }
+    // Category chips.
+    {
+        const float chipX0 = searchR.x + searchR.width + 12.0f;
+        const float chipW = (x0 + gridW - chipX0 - 5.0f * 6.0f) / 6.0f;
+        for (int c = -1; c < kModeCategoryCount; ++c) {
+            const Rectangle cr = {chipX0 + static_cast<float>(c + 1) * (chipW + 6.0f), searchR.y, chipW, searchR.height};
+            const bool on = modeCategory_ == c;
+            if (Tab(cr, c < 0 ? "All" : CategoryName(static_cast<ModeCategory>(c)), on)) {
+                modeCategory_ = c;
+                menuScroll_ = 0.0f;
+            }
+        }
+    }
+
+    // Matching modes.
+    auto lower = [](std::string v) {
+        for (char& k : v) k = static_cast<char>(std::tolower(static_cast<unsigned char>(k)));
+        return v;
+    };
+    const std::string q = lower(modeSearch_);
+    std::vector<ModeId> shown;
     for (int i = 0; i < kPlayableModeCount; ++i) {
         const ModeId m = static_cast<ModeId>(i);
-        const float cx = x0 + static_cast<float>(i % 3) * (cw + gap);
-        const float cy = 200.0f + static_cast<float>(i / 3) * (ch + gap);
+        if (modeCategory_ >= 0 && static_cast<int>(CategoryOf(m)) != modeCategory_) continue;
+        if (!q.empty()) {
+            const std::string hay = lower(std::string(ModeName(m)) + " " + ModeTags(m) + " " + CategoryName(CategoryOf(m)) + " " +
+                                          ModeDescription(m));
+            // Every word of the query must appear somewhere.
+            bool all = true;
+            size_t p = 0;
+            while (p < q.size() && all) {
+                const size_t e = std::min(q.find(' ', p), q.size());
+                if (e > p && hay.find(q.substr(p, e - p)) == std::string::npos) all = false;
+                p = e + 1;
+            }
+            if (!all) continue;
+        }
+        shown.push_back(m);
+    }
+    // Enter opens the first match.
+    if (!q.empty() && !shown.empty() && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))) {
+        ClearFocus();
+        OpenModeSetup(shown[0]);
+        return;
+    }
+
+    const Rectangle gridR = {x0, 222.0f, gridW, 3.0f * ch + 2.0f * gap};
+    const int rows = (static_cast<int>(shown.size()) + 2) / 3;
+    const float contentH = static_cast<float>(rows) * (ch + gap) - gap;
+    const float maxScroll = std::max(0.0f, contentH - gridR.height);
+    if (Hover(gridR)) menuScroll_ -= GetMouseWheelMove() * (ch + gap) * 0.75f;
+    menuScroll_ = std::clamp(menuScroll_, 0.0f, maxScroll);
+
+    const Rectangle clip = ToScreen(gridR);
+    BeginScissorMode(static_cast<int>(clip.x), static_cast<int>(clip.y), static_cast<int>(clip.width) + 1,
+                     static_cast<int>(clip.height) + 1);
+    ModeId clicked = ModeId::Count;
+    for (size_t k = 0; k < shown.size(); ++k) {
+        const ModeId m = shown[k];
+        const float cx = x0 + static_cast<float>(k % 3) * (cw + gap);
+        const float cy = gridR.y + static_cast<float>(k / 3) * (ch + gap) - menuScroll_;
+        if (cy + ch < gridR.y || cy > gridR.y + gridR.height) continue;
         long long best = 0;
         std::string line1, line2;
         if (m == ModeId::VsBot) {
@@ -254,14 +410,27 @@ void App::ScreenMainMenu() {
             if (m == ModeId::Sniper) line2 += std::string("  |  ") + SniperName(static_cast<SniperWeapon>(cfg_.sniperWeapon));
         }
         const std::string title = m == ModeId::Placement ? "Placement" : ModeName(m);
-        if (Card(Rectangle{cx, cy, cw, ch}, m, title, ModeDescription(m), line1, line2)) {
-            OpenModeSetup(m);
-            return;
-        }
+        if (Card(Rectangle{cx, cy, cw, ch}, m, title, ModeDescription(m), line1, line2) && Hover(gridR)) clicked = m;
     }
-    Text(TextFormat("Runs last %d s (change in Settings > Gameplay)  |  Esc pause  |  %s restart  |  %s FPS counter",
-                    cfg_.runSeconds, input::BindName(cfg_.keys.restart).c_str(), input::BindName(cfg_.keys.toggleFps).c_str()),
-         x0, 200.0f + 3.0f * (ch + gap) + 6.0f, 18.0f, theme::kTextDim);
+    EndScissorMode();
+    if (shown.empty()) {
+        Text("No mode matches that search.", gridR.x + 20.0f, gridR.y + 30.0f, 22.0f, theme::kTextDim);
+    }
+    // Scroll bar.
+    if (maxScroll > 0.0f) {
+        const float barH = gridR.height * gridR.height / contentH;
+        const float barY = gridR.y + (gridR.height - barH) * (menuScroll_ / maxScroll);
+        Fill(Rectangle{gridR.x + gridR.width + 6.0f, gridR.y, 4.0f, gridR.height}, Alpha(theme::kLine, 0.6f));
+        Fill(Rectangle{gridR.x + gridR.width + 6.0f, barY, 4.0f, barH}, theme::kAccent);
+    }
+    if (clicked != ModeId::Count) {
+        ClearFocus();
+        OpenModeSetup(clicked);
+        return;
+    }
+    Text(TextFormat("%d modes  |  scroll for more  |  Esc pause  |  %s restart  |  %s FPS counter", static_cast<int>(shown.size()),
+                    input::BindName(cfg_.keys.restart).c_str(), input::BindName(cfg_.keys.toggleFps).c_str()),
+         x0, gridR.y + gridR.height + 10.0f, 18.0f, theme::kTextDim);
 
     // Right column.
     const float rx = x0 + gridW + 40.0f;
@@ -372,9 +541,9 @@ void App::ScreenResults() {
     }
     if (s.mode != ModeId::VsBot && s.mode != ModeId::Sniper) {
         tile(0, 0, scoreTitle, std::to_string(shown), theme::kAccent);
-        tile(1, 0, s.mode == ModeId::Tracking ? "ACCURACY (ON TARGET WHILE FIRING)" : "ACCURACY", Fmt(s.Accuracy() * 100.0, 1) + "%",
+        tile(1, 0, IsTrackingMode(s.mode) ? "ACCURACY (ON TARGET WHILE FIRING)" : "ACCURACY", Fmt(s.Accuracy() * 100.0, 1) + "%",
              theme::kAccent);
-        if (s.mode == ModeId::Tracking) {
+        if (IsTrackingMode(s.mode)) {
             tile(2, 0, "TIME ON TARGET", Fmt(s.trackOnTime, 1) + " s", theme::kText);
             tile(3, 0, "TRACKING %", Fmt(std::max(0.0, s.TrackingPct()) * 100.0, 1) + "%", theme::kText);
         } else {
@@ -610,7 +779,7 @@ void App::SettingsSensitivity(float x, float y, float w) {
 }
 
 void App::SettingsVideo(float x, float y, float w) {
-    static const char* const modes[] = {"Fullscreen", "Borderless", "Windowed"};
+    static const char* const modes[] = {"Exclusive FS", "Borderless", "Windowed"};
     int dm = static_cast<int>(cfg_.displayMode);
     const float cw = std::min(760.0f, w);
     if (Stepper(Rectangle{x, y, cw, 50.0f}, "Display mode", &dm, modes, 3)) {
@@ -638,6 +807,9 @@ void App::SettingsVideo(float x, float y, float w) {
              theme::kAccent);
     StatTile(Rectangle{x + 500.0f, y + 280.0f, 260.0f, 96.0f}, "RESOLUTION",
              TextFormat("%dx%d", GetScreenWidth(), GetScreenHeight()), theme::kText);
+    TextBlock("Streaming on Discord / OBS or taking screenshots: use Borderless. Exclusive Fullscreen can't be "
+              "captured by window capture (viewers see a frozen frame) and switches the display mode on Alt-Tab.",
+              x, y + 560.0f, cw, 20.0f, theme::kWarn);
     TextBlock("FOV is fixed like Valorant: 103 degrees horizontal on a 16:9 screen, with Hor+ scaling (the vertical FOV "
               "stays at 70.53 degrees and the horizontal FOV follows your aspect ratio). V-Sync is always off. The menus "
               "are limited to 240 FPS to keep your GPU cool; gameplay uses the FPS cap above. If you still see a cap, "
@@ -816,6 +988,7 @@ void App::SettingsKeybinds(float x, float y, float w) {
                   {"Toggle FPS counter", &cfg_.keys.toggleFps, false},
                   {"Scope (Sniper)", &cfg_.keys.scope, false},
                   {"Reload (VS Bot)", &cfg_.keys.reload, false},
+                  {"Screenshot (copies to clipboard)", &cfg_.keys.screenshot, false},
                   {"Move forward", &cfg_.keys.forward, false},
                   {"Move back", &cfg_.keys.back, false},
                   {"Move left", &cfg_.keys.left, false},
@@ -824,7 +997,7 @@ void App::SettingsKeybinds(float x, float y, float w) {
                   {"Crouch (hold)", &cfg_.keys.crouch, false},
                   {"Jump", &cfg_.keys.jump, false}};
     constexpr int kRows = static_cast<int>(sizeof(rows) / sizeof(rows[0]));
-    constexpr int kLeftRows = 6;
+    constexpr int kLeftRows = 7;
     const float gap = 30.0f;
     const float cw = (w - gap) * 0.5f;
 
@@ -856,7 +1029,7 @@ void App::SettingsKeybinds(float x, float y, float w) {
         // Same key on two actions?
         bool clash = false;
         // (Restart and Reload may share a key: restart is off in VS Bot, where R reloads.)
-        auto sharedOk = [&](int a, int b) { return (a == 1 && b == 5) || (a == 5 && b == 1); };
+        auto sharedOk = [&](int a, int b) { return (a == 1 && b == 5) || (a == 5 && b == 1); };  // restart / reload
         for (int j = 0; j < kRows; ++j) {
             clash = clash || (j != i && !sharedOk(i, j) && *rows[j].code == *rows[i].code && *rows[i].code > 0);
         }
@@ -868,8 +1041,8 @@ void App::SettingsKeybinds(float x, float y, float w) {
         }
         if (clash && rebinding_ != i) Border(br, 2.0f, theme::kWarn);
     }
-    const float by = y + 30.0f + 7.0f * 62.0f + 10.0f;
-    Toggle(Rectangle{x, y + 30.0f + 6.0f * 62.0f + 8.0f, cw, 46.0f}, "Hold to scope (off = toggle)", &cfg_.scopeHold);
+    const float by = y + 30.0f + 8.0f * 62.0f + 10.0f;
+    Toggle(Rectangle{x, y + 30.0f + 7.0f * 62.0f + 8.0f, cw, 46.0f}, "Hold to scope (off = toggle)", &cfg_.scopeHold);
     if (!xhMessage_.empty() && settingsTab_ == 5) Text(xhMessage_, x, by + 20.0f, 20.0f, theme::kWarn);
     TextBlock("Keys with a yellow border are used twice. Shooting on a mouse button is read directly from Raw Input "
               "together with the movement, so each click is evaluated at the exact crosshair position it happened at.",
@@ -882,12 +1055,13 @@ void App::SettingsKeybinds(float x, float y, float w) {
 void App::ScreenStats() {
     const float x0 = ContentX();
     Title("STATS & PROGRESS", x0, 50.0f, 52.0f);
-    const float tabW = kContentWidth / static_cast<float>(kPlayableModeCount);
+    // Two rows of mode tabs (19 modes).
+    constexpr int kPerRow = 10;
+    const float tabW = kContentWidth / static_cast<float>(kPerRow);
     for (int i = 0; i < kPlayableModeCount; ++i) {
-        if (Tab(Rectangle{x0 + static_cast<float>(i) * tabW, 130.0f, tabW, 52.0f}, ModeShortName(static_cast<ModeId>(i)),
-                statsMode_ == i)) {
-            statsMode_ = i;
-        }
+        const float tx = x0 + static_cast<float>(i % kPerRow) * tabW;
+        const float ty = 112.0f + static_cast<float>(i / kPerRow) * 36.0f;
+        if (Tab(Rectangle{tx, ty, tabW, 34.0f}, ModeShortName(static_cast<ModeId>(i)), statsMode_ == i)) statsMode_ = i;
     }
     Fill(Rectangle{x0, 182.0f, kContentWidth, 1.0f}, theme::kLine);
 
@@ -917,7 +1091,7 @@ void App::ScreenStats() {
              theme::kAccent);
     StatTile(Rectangle{x0 + 2.0f * (tw + 10.0f), ty, tw, 96.0f}, "BEST ACCURACY", runs.empty() ? "-" : Fmt(bestAcc, 1) + "%",
              theme::kAccent);
-    if (m == ModeId::Tracking) {
+    if (IsTrackingMode(m)) {
         StatTile(Rectangle{x0 + 3.0f * (tw + 10.0f), ty, tw, 96.0f}, "BEST TRACKING", runs.empty() ? "-" : Fmt(bestTrack, 1) + "%",
                  theme::kAccent);
     } else {
@@ -931,14 +1105,14 @@ void App::ScreenStats() {
     int bestIdx = -1;
     for (size_t i = first; i < runs.size(); ++i) {
         scores.push_back(static_cast<float>(runs[i]->score));
-        second.push_back(static_cast<float>(m == ModeId::Tracking ? std::max(0.0, runs[i]->trackingPct) : runs[i]->accuracy));
+        second.push_back(static_cast<float>(IsTrackingMode(m) ? std::max(0.0, runs[i]->trackingPct) : runs[i]->accuracy));
         if (runs[i]->score == bestScore && bestIdx < 0) bestIdx = static_cast<int>(i - first);
     }
     const float gw = (kContentWidth - 90.0f) * 0.5f;
     LineChart(Rectangle{x0 + 60.0f, 360.0f, gw - 20.0f, 300.0f}, scores, theme::kAccent, bestIdx,
               "SCORE (last 60 runs, PB highlighted)");
     LineChart(Rectangle{x0 + gw + 110.0f, 360.0f, gw - 20.0f, 300.0f}, second, theme::kGood, -1,
-              m == ModeId::Tracking ? "TRACKING % " : "ACCURACY %");
+              IsTrackingMode(m) ? "TRACKING % " : "ACCURACY %");
 
     // Recent runs table.
     float ry = 700.0f;
@@ -1218,27 +1392,25 @@ void App::ScreenRank() {
                   big.x + 40.0f, big.y + 400.0f, big.width - 80.0f, 20.0f, theme::kTextDim);
     }
 
-    // Per-mode ranks.
+    // Per-mode ranks: two columns (VS Bot matches are not part of the aim rank).
     const float mx = x0 + 660.0f, mw = kContentWidth - 660.0f;
+    const float colW = (mw - 10.0f) * 0.5f;
+    int slot = 0;
     for (int i = 0; i < kPlayableModeCount; ++i) {
         const ModeId m = static_cast<ModeId>(i);
-        if (m == ModeId::VsBot) continue;  // matches are not part of the aim rank
-        const Rectangle row = {mx, 160.0f + static_cast<float>(i) * 70.0f, mw, 62.0f};
-        Angled(row, theme::kPanel, 12.0f);
+        if (m == ModeId::VsBot) continue;
+        const Rectangle row = {mx + static_cast<float>(slot % 2) * (colW + 10.0f), 160.0f + static_cast<float>(slot / 2) * 64.0f,
+                               colW, 58.0f};
+        ++slot;
+        Angled(row, theme::kPanel, 10.0f);
         AimRank mr;
         int ranked = 0;
         const bool has = ModeRank(stats_, m, mr, &ranked);
-        if (has) {
-            DrawRankBadge(row.x + 40.0f, row.y + 26.0f, 40.0f, mr);
-        } else {
-            DrawRankBadge(row.x + 40.0f, row.y + 26.0f, 40.0f, AimRank{}, 0.2f, false);
-        }
-        TextBold(ModeName(m), row.x + 80.0f, row.y + 8.0f, 21.0f, theme::kText);
-        Text(has ? TextFormat("%d ranked runs", ranked) : "Not ranked yet - play a 20 s+ run", row.x + 80.0f, row.y + 36.0f,
-             15.0f, theme::kTextDim);
-        if (has) {
-            RankText(mr, row.x + row.width - 24.0f, row.y + 16.0f, 27.0f, Align::Right);
-        }
+        if (has) DrawRankBadge(row.x + 30.0f, row.y + 26.0f, 32.0f, mr);
+        else DrawRankBadge(row.x + 30.0f, row.y + 26.0f, 32.0f, AimRank{}, 0.2f, false);
+        TextBold(ModeName(m), row.x + 58.0f, row.y + 7.0f, 18.0f, theme::kText);
+        Text(has ? TextFormat("%d ranked runs", ranked) : "Not ranked yet", row.x + 58.0f, row.y + 33.0f, 14.0f, theme::kTextDim);
+        if (has) RankText(mr, row.x + row.width - 14.0f, row.y + 30.0f, 19.0f, Align::Right);
     }
 
     // Tier ladder.

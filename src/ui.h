@@ -80,6 +80,8 @@ bool Stepper(Rectangle r, const std::string& label, int* index, const char* cons
 // Returns true whenever the text changed. 'id' must be unique on screen.
 bool TextBox(Rectangle r, int id, std::string* text, size_t maxLen, bool numeric);
 bool AnyTextBoxFocused();
+// Gives a text box keyboard focus (e.g. "start typing to search").
+void FocusTextBox(int id);
 void ClearFocus();
 
 void StatTile(Rectangle r, const std::string& title, const std::string& value, Color accent);

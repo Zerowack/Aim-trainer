@@ -22,6 +22,9 @@
 
 #include "platform.h"
 
+#include <cwctype>
+#include <string>
+
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
 #endif
@@ -300,6 +303,101 @@ bool HasFocus() {
     const bool fg = GetForegroundWindow() == g_hwnd;
     if (fg) g_focused = true;
     return fg;
+}
+
+Foreground ForegroundKind() {
+    HWND fg = GetForegroundWindow();
+    if (!fg) return Foreground::None;
+    if (fg == g_hwnd) return Foreground::Us;
+    DWORD pid = 0;
+    GetWindowThreadProcessId(fg, &pid);
+    HANDLE proc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!proc) return Foreground::Other;
+    wchar_t path[MAX_PATH] = {};
+    DWORD len = MAX_PATH;
+    const BOOL ok = QueryFullProcessImageNameW(proc, 0, path, &len);
+    CloseHandle(proc);
+    if (!ok) return Foreground::Other;
+    const wchar_t* name = path;
+    for (const wchar_t* p = path; *p; ++p) {
+        if (*p == L'\\' || *p == L'/') name = p + 1;
+    }
+    std::wstring lower(name);
+    for (wchar_t& c : lower) c = static_cast<wchar_t>(towlower(c));
+    static const wchar_t* const tools[] = {L"snippingtool.exe",  L"screenclippinghost.exe", L"screensketch.exe",
+                                           L"sharex.exe",        L"lightshot.exe",          L"greenshot.exe",
+                                           L"gyazo.exe",         L"flameshot.exe",          L"snagit32.exe",
+                                           L"snagiteditor.exe",  L"gamebar.exe",            L"gamebarftserver.exe",
+                                           L"nvidia share.exe",  L"nvidia overlay.exe",     L"picpick.exe"};
+    for (const wchar_t* t : tools) {
+        if (lower == t) return Foreground::CaptureTool;
+    }
+    return Foreground::Other;
+}
+
+bool CopyImageToClipboard(const unsigned char* rgba, int width, int height) {
+    if (!rgba || width <= 0 || height <= 0 || !g_hwnd) return false;
+    const size_t pixels = static_cast<size_t>(width) * static_cast<size_t>(height);
+    const size_t bytes = sizeof(BITMAPINFOHEADER) + pixels * 4;
+    HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, bytes);
+    if (!mem) return false;
+    auto* hdr = static_cast<BITMAPINFOHEADER*>(GlobalLock(mem));
+    if (!hdr) {
+        GlobalFree(mem);
+        return false;
+    }
+    ZeroMemory(hdr, sizeof(BITMAPINFOHEADER));
+    hdr->biSize = sizeof(BITMAPINFOHEADER);
+    hdr->biWidth = width;
+    hdr->biHeight = height;  // bottom-up
+    hdr->biPlanes = 1;
+    hdr->biBitCount = 32;
+    hdr->biCompression = BI_RGB;
+    unsigned char* dst = reinterpret_cast<unsigned char*>(hdr + 1);
+    for (int y = 0; y < height; ++y) {
+        const unsigned char* src = rgba + static_cast<size_t>(height - 1 - y) * static_cast<size_t>(width) * 4;
+        unsigned char* row = dst + static_cast<size_t>(y) * static_cast<size_t>(width) * 4;
+        for (int x = 0; x < width; ++x) {
+            row[x * 4 + 0] = src[x * 4 + 2];
+            row[x * 4 + 1] = src[x * 4 + 1];
+            row[x * 4 + 2] = src[x * 4 + 0];
+            row[x * 4 + 3] = 255;
+        }
+    }
+    GlobalUnlock(mem);
+    if (!OpenClipboard(g_hwnd)) {
+        GlobalFree(mem);
+        return false;
+    }
+    EmptyClipboard();
+    const bool ok = SetClipboardData(CF_DIB, mem) != nullptr;
+    CloseClipboard();
+    if (!ok) GlobalFree(mem);  // on success the clipboard owns the memory
+    return ok;
+}
+
+namespace {
+struct BackgroundJob {
+    void (*fn)(void*);
+    void* arg;
+};
+DWORD WINAPI BackgroundThread(LPVOID p) {
+    BackgroundJob* job = static_cast<BackgroundJob*>(p);
+    job->fn(job->arg);
+    delete job;
+    return 0;
+}
+}  // namespace
+
+void RunInBackground(void (*fn)(void*), void* arg) {
+    BackgroundJob* job = new BackgroundJob{fn, arg};
+    HANDLE h = CreateThread(nullptr, 0, &BackgroundThread, job, 0, nullptr);
+    if (h) {
+        CloseHandle(h);
+    } else {
+        fn(arg);  // no thread: do it now
+        delete job;
+    }
 }
 
 void AllowMinimize() {

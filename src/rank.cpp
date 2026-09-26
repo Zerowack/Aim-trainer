@@ -33,6 +33,17 @@ bool ThresholdsFor(ModeId m, Thresholds& t) {
         // x speed (time to kill after the enemy showed up). Per peek, so every
         // rifle has the same ceiling.
         case ModeId::Sniper: t = {{0.08, 0.15, 0.23, 0.31, 0.40, 0.49, 0.58, 0.67, 0.78}, false}; return true;
+        // Classic scenarios: kills per second x accuracy (tracking: time on target).
+        case ModeId::Headshot: t = {{0.50, 0.68, 0.86, 1.04, 1.22, 1.40, 1.58, 1.76, 2.00}, false}; return true;
+        case ModeId::Sixshot: t = {{1.60, 2.10, 2.60, 3.10, 3.60, 4.10, 4.60, 5.10, 5.80}, false}; return true;
+        case ModeId::Spidershot: t = {{0.90, 1.20, 1.50, 1.80, 2.10, 2.40, 2.70, 3.00, 3.40}, false}; return true;
+        case ModeId::Motionshot: t = {{0.80, 1.10, 1.40, 1.70, 2.00, 2.30, 2.60, 2.90, 3.30}, false}; return true;
+        case ModeId::SmoothTrack: t = {{40.0, 48.0, 55.0, 62.0, 68.0, 74.0, 79.0, 84.0, 89.0}, false}; return true;
+        case ModeId::StrafeTap: t = {{0.35, 0.50, 0.65, 0.80, 0.95, 1.10, 1.25, 1.40, 1.60}, false}; return true;
+        case ModeId::TargetSwitch: t = {{0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95, 1.05, 1.18}, false}; return true;
+        case ModeId::LongRange: t = {{0.35, 0.50, 0.65, 0.80, 0.95, 1.10, 1.25, 1.40, 1.60}, false}; return true;
+        case ModeId::Microflex: t = {{0.80, 1.05, 1.30, 1.55, 1.80, 2.05, 2.30, 2.55, 2.90}, false}; return true;
+        case ModeId::Popcorn: t = {{0.60, 0.80, 1.00, 1.20, 1.40, 1.60, 1.80, 2.00, 2.30}, false}; return true;
         // Crosshair Placement: average angle to the head when agents appear (deg).
         case ModeId::Placement: t = {{12.0, 9.5, 7.5, 5.8, 4.5, 3.5, 2.6, 1.9, 1.2}, true}; return true;
         default: return false;
@@ -202,6 +213,7 @@ bool RankFromRecord(const RunRecord& rec, AimRank& out) {
             value = rec.placementErr;
             break;
         case ModeId::Tracking:
+        case ModeId::SmoothTrack:
             if (rec.trackingPct < 0.0) return false;
             // Time on target, weighed by how much of your firing was on target
             // (holding the trigger the whole time doesn't pay).

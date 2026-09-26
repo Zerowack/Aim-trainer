@@ -178,6 +178,7 @@ Valtrainer shows your eDPI (`DPI × sens`) and cm/360
 | Pause / menu | Esc (always) or P |
 | Restart run (in VS Bot, R reloads) | R |
 | FPS counter on/off | F2 |
+| Screenshot (clipboard + PNG) | F12 |
 | Move / walk / crouch / jump (VS Bot, Sniper) | W A S D, Left Shift, Left Ctrl, Space |
 | Reload (VS Bot) | R |
 
@@ -273,6 +274,28 @@ To minimize in any display mode, click Valtrainer's taskbar button, press Win+Do
    your shots were fired while moving. VS Bot matches are **unranked**: they don't count towards your
    aim rank.
 
+10. **Classic aim-trainer scenarios** (all with Easy / Normal / Hard / Insane and their own ranks):
+    - **Headshot**: agents appear around you one at a time; only headshots count.
+    - **Sixshot**: six small targets on a wall; destroy one and another appears.
+    - **Spidershot**: flick out to a target, then back to the centre, over and over.
+    - **Motionshot**: three targets drift across the wall; click them while they move.
+    - **Smooth Tracking**: hold fire on a target moving in smooth, never-repeating curves.
+    - **Strafe Tap**: one-tap the head of an agent doing ADAD strafes.
+    - **Target Switch**: three strafing agents with health bars; track one until it dies, then switch.
+    - **Long Range**: tiny targets 30–45 m away.
+    - **Microflex**: tiny targets pop up right next to your crosshair (micro-adjustments).
+    - **Popcorn**: targets thrown into the air; hit them before they land.
+
+**Finding a mode:** the main menu has a search box (just start typing, e.g. "head", "track", "switch") and
+category filters (Flicking, Precision, Tracking, Reaction, Valorant). Scroll the grid with the mouse wheel;
+Enter opens the first match.
+
+**Screenshots:** press **F12** (rebindable). The exact frame is copied to your clipboard (paste it straight
+into Discord) and saved as a PNG in the `Screenshots` folder next to the exe, without freezing the game.
+
+**Streaming (Discord / OBS):** use **Borderless** display mode (the default). Exclusive fullscreen can't be
+captured by window capture, so viewers only see a frozen frame.
+
 **Scoped sensitivity:** Settings → Sensitivity → *Scoped sensitivity multiplier* is the same
 setting as Valorant's (Settings → General → Mouse). While scoped, each mouse count turns
 `0.07 × sens × multiplier ÷ zoom` degrees, so 1.0 keeps the same on-screen speed at every zoom level. The settings page shows your effective
@@ -364,6 +387,7 @@ Copy the new value into Valorant to keep both games the same. Everything is appe
 | `src/modes.h`, `src/modes.cpp` | the training modes and the mixed Sens Finder test |
 | `src/vsbot.cpp` | VS Bot: rifle, arena and bot AI per rank |
 | `src/sniper.cpp` | Sniper: the angle-holding lane, peek types, enemy return fire |
+| `src/modes_extra.cpp` | Headshot, Sixshot, Spidershot, Motionshot, Smooth Tracking, Strafe Tap, Target Switch, Long Range, Microflex, Popcorn |
 | `src/movement.h`, `src/movement.cpp` | Valorant-style movement shared by VS Bot and Sniper (run, walk, crouch, jump, counter-strafe) |
 | `src/sens_finder.h`, `src/sens_finder.cpp` | PSA logic, scoring, session storage and averaging |
 | `src/stats.h`, `src/stats.cpp` | run statistics, coaching tips, `stats.csv` |

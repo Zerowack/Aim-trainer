@@ -17,7 +17,7 @@
 #include "stats.h"
 #include "world.h"
 
-constexpr const char* kAppVersion = "2.0.2";
+constexpr const char* kAppVersion = "2.1.0";
 
 // Game clock = real time minus all time spent paused.
 struct GameClock {
@@ -117,6 +117,7 @@ private:
     void OpenSettings(Screen returnTo);
     void DrawSensSummary(float x, float y, float w, double dpi, double sens);
     void DrawFpsCounter();
+    void TakeScreenshotNow();
 
     // --- core objects
     Config cfg_;
@@ -180,6 +181,9 @@ private:
     std::string xhCodeText_;
     std::string xhMessage_;
     int statsMode_ = 0;
+    std::string modeSearch_;         // main menu mode browser
+    int modeCategory_ = -1;          // -1 = all
+    float menuScroll_ = 0.0f;
 
     // --- performance display / frame pacing
     double lastFrameTime_ = 0.0;
@@ -191,6 +195,10 @@ private:
     double worstMsShown_ = 0.0;
     double nextFrameDeadline_ = 0.0;
     int monitorHz_ = 60;             // cached, see ApplyDisplayMode()
+    bool screenshotRequested_ = false;
+    std::string screenshotToast_;
+    double screenshotToastUntil_ = 0.0;
+    double minimizeDecideUntil_ = 0.0;  // Fullscreen: minimize once we know who took focus
 
     // --- misc
     bool selfTestRan_ = false;

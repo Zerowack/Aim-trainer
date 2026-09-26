@@ -4,9 +4,24 @@
 #include <string>
 #include <vector>
 
-enum class ModeId : int { Gridshot = 0, Microshot, Tracking, Flick180, Reaction, Peek, Placement, Sniper, VsBot, Mixed, Count };
+enum class ModeId : int {
+    Gridshot = 0, Microshot, Tracking, Flick180, Reaction, Peek, Placement, Sniper, VsBot,
+    // Classic aim-trainer scenarios.
+    Headshot, Sixshot, Spidershot, Motionshot, SmoothTrack, StrafeTap, TargetSwitch, LongRange, Microflex, Popcorn,
+    Mixed, Count
+};
 
-constexpr int kPlayableModeCount = 9;  // everything except Mixed (sens finder only)
+constexpr int kPlayableModeCount = 19;  // everything except Mixed (sens finder only)
+
+// Groups for the mode browser on the main menu.
+enum class ModeCategory : int { Flicking = 0, Precision, Tracking, Reaction, Valorant, Count };
+constexpr int kModeCategoryCount = 5;
+ModeCategory CategoryOf(ModeId m);
+const char* CategoryName(ModeCategory c);  // "Flicking"
+// Extra search words (e.g. "click speed wall") for the mode browser.
+const char* ModeTags(ModeId m);
+// Modes scored by time on target while firing (accuracy = on target / firing).
+bool IsTrackingMode(ModeId m);
 
 // Sniper rifles for the Sniper mode.
 enum class SniperWeapon : int { Marshal = 0, Outlaw, Operator, Count };
