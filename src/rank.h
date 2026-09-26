@@ -36,6 +36,13 @@ Color TierColor(int tier);
 std::string RankLabel(const AimRank& r);  // "Gold 2", "Radiant"
 
 AimRank RankFromPoints(double points);
+
+// A (friendly) roast for the rank. 'seed' picks one of several lines per
+// tier; pass something stable (e.g. the run's rank points) so it does not
+// change every frame.
+const char* RankRoast(const AimRank& r, unsigned int seed);
+// Neutral one-line description of the tier (used when roast mode is off).
+const char* RankDescription(const AimRank& r);
 // Skill value for a run (higher is better; Reaction is inverted internally).
 // Returns false when the run cannot be ranked (sens finder test, too short,
 // too few hits).

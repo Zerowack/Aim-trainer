@@ -197,6 +197,12 @@ rank on the main menu averages all modes you've played (at least 3 are needed). 
 estimates **aim only**: real rank also depends on game sense, utility and teamwork, and the
 tier cut-offs are calibrated estimates, not official Riot data.
 
+Click the rank panel on the main menu for the **Rank screen**: a big emblem for your
+overall rank, your rank in every mode, and the full tier ladder. Every tier has its own
+emblem (original artwork, not Riot's). **Roast mode** (on by default, Settings → Gameplay)
+adds a comment to your rank, from "just delete the game, it's not for u lil bro" at Iron
+up to "touch grass, you've peaked" at Radiant. Turn it off for neutral descriptions.
+
 **Auto-adjust sens (optional):** turn on Settings → Sensitivity → *Auto-adjust sens from coach*
 and the coach's over/undershoot suggestion is applied to your sens after each run
 (2–15% at a time). It only changes when the run has enough flick data and a clear
@@ -254,7 +260,8 @@ Copy the new value into Valorant to keep both games the same. Everything is appe
 | `src/modes.h`, `src/modes.cpp` | the six training modes and the mixed Sens Finder test |
 | `src/sens_finder.h`, `src/sens_finder.cpp` | PSA logic, scoring, session storage and averaging |
 | `src/stats.h`, `src/stats.cpp` | run statistics, coaching tips, `stats.csv` |
-| `src/rank.h`, `src/rank.cpp` | estimated aim rank (tier thresholds per mode) |
+| `src/rank.h`, `src/rank.cpp` | estimated aim rank (tier thresholds per mode), roasts |
+| `src/rank_badge.h`, `src/rank_badge.cpp` | vector emblems for the 9 tiers |
 | `src/config.h`, `src/config.cpp` | settings and `config.ini` |
 | `src/crosshair.h`, `src/crosshair.cpp` | crosshair drawing and share codes |
 | `src/ui.h`, `src/ui.cpp` | dark, sharp-angled immediate-mode UI and charts |

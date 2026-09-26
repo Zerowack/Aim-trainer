@@ -7,6 +7,7 @@
 #include "app.h"
 #include "crosshair.h"
 #include "input.h"
+#include "rank_badge.h"
 #include "ui.h"
 
 using namespace ui;
@@ -111,45 +112,6 @@ bool Card(Rectangle r, ModeId mode, const std::string& title, const std::string&
     Text(footer, r.x + 26.0f + 6.0f * a, r.y + r.height - 34.0f, 18.0f, Lerp2(theme::kText, theme::kAccent, a));
     DrawModeIcon(mode, r.x + r.width - 68.0f, r.y + r.height * 0.55f, 70.0f, Lerp2(theme::kTextDim, theme::kText, a));
     return hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-}
-
-// Rank badge: angular hexagon in the tier colour with division pips below.
-// Original design (no Riot rank artwork).
-void RankBadge(float cx, float cy, float size, const AimRank& r) {
-    const Color c = TierColor(r.tier);
-    const Color dark = {18, 21, 28, 255};
-    auto hexPoint = [&](int i, float rad) {
-        const float a = (60.0f * static_cast<float>(i) - 90.0f) * 3.14159265f / 180.0f;
-        return Vector2{cx + std::cos(a) * rad, cy + std::sin(a) * rad};
-    };
-    const float R = size * 0.5f;
-    for (int i = 0; i < 6; ++i) Tri(Vector2{cx, cy}, hexPoint(i, R), hexPoint(i + 1, R), c);
-    for (int i = 0; i < 6; ++i) Tri(Vector2{cx, cy}, hexPoint(i, R * 0.78f), hexPoint(i + 1, R * 0.78f), dark);
-    // Chevron in the middle; higher tiers get a second one.
-    auto chevron = [&](float oy, float k) {
-        Tri(Vector2{cx - R * 0.42f * k, cy + oy}, Vector2{cx, cy + oy - R * 0.34f * k}, Vector2{cx, cy + oy - R * 0.14f * k}, c);
-        Tri(Vector2{cx - R * 0.42f * k, cy + oy}, Vector2{cx, cy + oy - R * 0.14f * k}, Vector2{cx - R * 0.42f * k, cy + oy + R * 0.2f * k}, c);
-        Tri(Vector2{cx + R * 0.42f * k, cy + oy}, Vector2{cx, cy + oy - R * 0.14f * k}, Vector2{cx, cy + oy - R * 0.34f * k}, c);
-        Tri(Vector2{cx + R * 0.42f * k, cy + oy}, Vector2{cx + R * 0.42f * k, cy + oy + R * 0.2f * k}, Vector2{cx, cy + oy - R * 0.14f * k}, c);
-    };
-    if (r.tier >= kTierCount - 1) {
-        Circle(Vector2{cx, cy}, R * 0.3f, c);
-        CircleLines(Vector2{cx, cy}, R * 0.95f, 2.0f, Alpha(c, 0.6f));
-    } else if (r.tier >= 5) {
-        chevron(R * 0.02f, 1.0f);
-        chevron(R * 0.30f, 0.8f);
-    } else {
-        chevron(R * 0.12f, 1.0f);
-    }
-    // Division pips (3 bars, filled up to the division).
-    if (r.tier < kTierCount - 1) {
-        const float pw = size * 0.16f, ph = size * 0.06f, gap = size * 0.05f;
-        const float total = 3.0f * pw + 2.0f * gap;
-        for (int i = 0; i < 3; ++i) {
-            const Rectangle pip = {cx - total * 0.5f + static_cast<float>(i) * (pw + gap), cy + R + size * 0.08f, pw, ph};
-            Fill(pip, i < r.division ? c : Alpha(c, 0.25f));
-        }
-    }
 }
 
 // Text colour-coded to the tier.
@@ -289,21 +251,27 @@ void App::ScreenMainMenu() {
         return;
     }
 
-    // Estimated aim rank.
-    const Rectangle rp = {rx, by + 88.0f, rw, 150.0f};
-    Angled(rp, theme::kPanel, 16.0f);
-    Text("AIM RANK (ESTIMATE)", rp.x + 24.0f, rp.y + 16.0f, 18.0f, theme::kAccent);
+    // Estimated aim rank (click for the full rank screen).
+    const Rectangle rp = {rx, by + 88.0f, rw, 170.0f};
+    const float ra = HoverAnim(rp);
+    Angled(rp, Lerp2(theme::kPanel, theme::kPanel2, ra), 16.0f);
+    Text("AIM RANK (ESTIMATE)", rp.x + 24.0f, rp.y + 14.0f, 18.0f, theme::kAccent);
+    Text("DETAILS >", rp.x + rp.width - 24.0f, rp.y + 14.0f, 16.0f, Lerp2(theme::kTextDim, theme::kText, ra), Align::Right);
     AimRank overall;
     int modesUsed = 0;
     if (OverallRank(stats_, overall, &modesUsed)) {
-        RankBadge(rp.x + 70.0f, rp.y + 82.0f, 70.0f, overall);
-        RankText(overall, rp.x + 130.0f, rp.y + 52.0f, 36.0f);
-        Text(TextFormat("From %d modes (last 5 runs each)", modesUsed), rp.x + 130.0f, rp.y + 96.0f, 16.0f, theme::kTextDim);
-        Text("Aim only - not an official rank", rp.x + 130.0f, rp.y + 118.0f, 16.0f, Alpha(theme::kTextDim, 0.7f));
+        DrawRankBadge(rp.x + 72.0f, rp.y + 92.0f, 90.0f, overall);
+        RankText(overall, rp.x + 138.0f, rp.y + 44.0f, 34.0f);
+        TextBlock(RankComment(overall, static_cast<unsigned int>(overall.points * 100.0)), rp.x + 138.0f, rp.y + 88.0f,
+                  rp.width - 160.0f, 16.0f, theme::kText);
     } else {
         TextBlock(TextFormat("Play %d different modes (20 s+ runs) to get your overall aim rank. Modes ranked: %d / %d.",
                              kMinModesForOverall, modesUsed, kMinModesForOverall),
                   rp.x + 24.0f, rp.y + 48.0f, rp.width - 48.0f, 18.0f, theme::kTextDim);
+    }
+    if (Hover(rp) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        screen_ = Screen::Rank;
+        return;
     }
 
     if (selfTestRan_) {
@@ -362,36 +330,39 @@ void App::ScreenResults() {
     tile(3, 1, "AVG CLICK ERROR", s.MeanErrDeg() >= 0.0 ? Fmt(s.MeanErrDeg(), 2) + " deg" : "-", theme::kText);
 
     // Coaching tips.
-    // Rank strip: this run's rank + progress, and the mode rank (last 5 runs).
+    // Rank strip: this run's rank, progress, mode rank and a comment.
     {
-        const Rectangle rr = {x0, 424.0f, kContentWidth, 72.0f};
+        const Rectangle rr = {x0, 424.0f, kContentWidth, 104.0f};
         Angled(rr, theme::kPanel, 14.0f);
         if (lastRunRanked_) {
-            RankBadge(rr.x + 44.0f, rr.y + 32.0f, 44.0f, lastRunRank_);
-            Text("THIS RUN", rr.x + 84.0f, rr.y + 12.0f, 16.0f, theme::kTextDim);
-            RankText(lastRunRank_, rr.x + 84.0f, rr.y + 32.0f, 28.0f);
+            Fill(Rectangle{rr.x, rr.y, 5.0f, rr.height - 14.0f}, TierColor(lastRunRank_.tier));
+            DrawRankBadge(rr.x + 56.0f, rr.y + 46.0f, 66.0f, lastRunRank_);
+            Text("THIS RUN", rr.x + 110.0f, rr.y + 12.0f, 16.0f, theme::kTextDim);
+            RankText(lastRunRank_, rr.x + 110.0f, rr.y + 32.0f, 30.0f);
             if (lastRunRank_.tier < kTierCount - 1) {
-                const Rectangle bar = {rr.x + 300.0f, rr.y + 40.0f, 360.0f, 8.0f};
+                const Rectangle bar = {rr.x + 330.0f, rr.y + 44.0f, 330.0f, 8.0f};
                 Fill(bar, theme::kBg);
                 Fill(Rectangle{bar.x, bar.y, bar.width * static_cast<float>(lastRunRank_.progress), bar.height},
                      TierColor(lastRunRank_.tier));
                 const AimRank next = RankFromPoints(std::floor(lastRunRank_.points) + 1.0);
-                Text(TextFormat("%.0f%% to %s", lastRunRank_.progress * 100.0, RankLabel(next).c_str()), bar.x, rr.y + 14.0f,
+                Text(TextFormat("%.0f%% to %s", lastRunRank_.progress * 100.0, RankLabel(next).c_str()), bar.x, rr.y + 18.0f,
                      16.0f, theme::kTextDim);
             }
             if (lastModeRanked_) {
                 Text(TextFormat("%s RANK (LAST 5 RUNS)", ModeName(s.mode)), rr.x + 720.0f, rr.y + 12.0f, 16.0f, theme::kTextDim);
-                RankText(lastModeRank_, rr.x + 720.0f, rr.y + 32.0f, 28.0f);
+                RankText(lastModeRank_, rr.x + 720.0f, rr.y + 32.0f, 30.0f);
             }
-            Text("Aim-only estimate", rr.x + rr.width - 24.0f, rr.y + 28.0f, 16.0f, Alpha(theme::kTextDim, 0.7f), Align::Right);
+            Text("Aim-only estimate", rr.x + rr.width - 24.0f, rr.y + 14.0f, 16.0f, Alpha(theme::kTextDim, 0.7f), Align::Right);
+            Text(RankComment(lastRunRank_, static_cast<unsigned int>(lastRunRank_.points * 1000.0)), rr.x + 110.0f,
+                 rr.y + 72.0f, 20.0f, TierColor(lastRunRank_.tier));
         } else {
             Text(s.duration < kMinRankedSeconds ? "Runs shorter than 20 s are not ranked."
                                                 : "Not enough hits in this run to estimate a rank.",
-                 rr.x + 24.0f, rr.y + 26.0f, 20.0f, theme::kTextDim);
+                 rr.x + 24.0f, rr.y + 40.0f, 20.0f, theme::kTextDim);
         }
     }
 
-    const Rectangle tipsR = {x0, 508.0f, kContentWidth, 232.0f};
+    const Rectangle tipsR = {x0, 540.0f, kContentWidth, 200.0f};
     Angled(tipsR, theme::kPanel, 16.0f);
     Text("COACH", tipsR.x + 24.0f, tipsR.y + 18.0f, 22.0f, theme::kAccent);
     float ty = tipsR.y + 56.0f;
@@ -548,6 +519,7 @@ void App::SettingsGameplay(float x, float y, float w) {
     cfg_.runSeconds = std::max(10, (cfg_.runSeconds + 2) / 5 * 5);
     SliderF(Rectangle{x, y + 80.0f, cw, 54.0f}, "Map brightness", &cfg_.mapBrightness, 0.2f, 1.6f, "%.2f");
 
+    Toggle(Rectangle{x, y + 470.0f, cw, 50.0f}, "Roast mode (funny rank comments)", &cfg_.roastMode);
     Text("TARGET COLOUR", x, y + 170.0f, 20.0f, theme::kTextDim);
     const Color targetPresets[] = {{80, 220, 255, 255}, {255, 75, 87, 255},  {255, 220, 40, 255},
                                    {90, 255, 120, 255}, {255, 110, 230, 255}, {255, 255, 255, 255}};
@@ -1034,4 +1006,89 @@ void App::ScreenFinderFinal() {
     }
     Text("Remember to set the same value in Valorant. Saved to finder_sessions.csv / finder_tests.csv.", x0, 820.0f, 18.0f,
          theme::kTextDim);
+}
+
+// ===========================================================================
+// Aim rank
+
+const char* App::RankComment(const AimRank& r, unsigned int seed) const {
+    return cfg_.roastMode ? RankRoast(r, seed) : RankDescription(r);
+}
+
+void App::ScreenRank() {
+    const float x0 = ContentX();
+    Title("AIM RANK", x0, 50.0f, 52.0f);
+    Text("Estimated from your trainer stats. Aim only - real rank also depends on game sense, utility and teamwork.",
+         x0 + 6.0f, 118.0f, 18.0f, theme::kTextDim);
+
+    // Overall rank, big.
+    const Rectangle big = {x0, 160.0f, 620.0f, 540.0f};
+    AimRank overall;
+    int modesUsed = 0;
+    const bool hasOverall = OverallRank(stats_, overall, &modesUsed);
+    Angled(big, theme::kPanel, 20.0f);
+    if (hasOverall) {
+        Fill(Rectangle{big.x, big.y, 6.0f, big.height - 20.0f}, TierColor(overall.tier));
+        DrawRankBadge(big.x + big.width * 0.5f, big.y + 170.0f, 230.0f, overall);
+        RankText(overall, big.x + big.width * 0.5f, big.y + 318.0f, 54.0f, Align::Center);
+        if (overall.tier < kTierCount - 1) {
+            const Rectangle bar = {big.x + 110.0f, big.y + 392.0f, big.width - 220.0f, 8.0f};
+            Fill(bar, theme::kBg);
+            Fill(Rectangle{bar.x, bar.y, bar.width * static_cast<float>(overall.progress), bar.height}, TierColor(overall.tier));
+            const AimRank next = RankFromPoints(std::floor(overall.points) + 1.0);
+            Text(TextFormat("%.0f%% to %s", overall.progress * 100.0, RankLabel(next).c_str()), big.x + big.width * 0.5f,
+                 bar.y + 14.0f, 16.0f, theme::kTextDim, Align::Center);
+        }
+        TextBlock(RankComment(overall, static_cast<unsigned int>(overall.points * 100.0)), big.x + 40.0f, big.y + 440.0f,
+                  big.width - 80.0f, 22.0f, theme::kText);
+    } else {
+        AimRank unranked;
+        DrawRankBadge(big.x + big.width * 0.5f, big.y + 170.0f, 230.0f, unranked, 0.25f, false);
+        TextBold("UNRANKED", big.x + big.width * 0.5f, big.y + 318.0f, 50.0f, theme::kTextDim, Align::Center);
+        TextBlock(TextFormat("Play at least %d different modes (runs of 20 s or longer) to get your overall rank. "
+                             "Modes ranked so far: %d.", kMinModesForOverall, modesUsed),
+                  big.x + 40.0f, big.y + 400.0f, big.width - 80.0f, 20.0f, theme::kTextDim);
+    }
+
+    // Per-mode ranks.
+    const float mx = x0 + 660.0f, mw = kContentWidth - 660.0f;
+    for (int i = 0; i < kPlayableModeCount; ++i) {
+        const ModeId m = static_cast<ModeId>(i);
+        const Rectangle row = {mx, 160.0f + static_cast<float>(i) * 90.0f, mw, 80.0f};
+        Angled(row, theme::kPanel, 12.0f);
+        AimRank mr;
+        int ranked = 0;
+        const bool has = ModeRank(stats_, m, mr, &ranked);
+        if (has) {
+            DrawRankBadge(row.x + 46.0f, row.y + 34.0f, 54.0f, mr);
+        } else {
+            DrawRankBadge(row.x + 46.0f, row.y + 34.0f, 54.0f, AimRank{}, 0.2f, false);
+        }
+        TextBold(ModeName(m), row.x + 92.0f, row.y + 14.0f, 24.0f, theme::kText);
+        Text(has ? TextFormat("%d ranked runs", ranked) : "Not ranked yet - play a 20 s+ run", row.x + 92.0f, row.y + 46.0f,
+             16.0f, theme::kTextDim);
+        if (has) {
+            RankText(mr, row.x + row.width - 24.0f, row.y + 24.0f, 30.0f, Align::Right);
+        }
+    }
+
+    // Tier ladder.
+    const float ly = 760.0f;
+    const float step = kContentWidth / static_cast<float>(kTierCount);
+    for (int t = 0; t < kTierCount; ++t) {
+        AimRank tr;
+        tr.tier = t;
+        tr.division = 3;
+        const bool current = hasOverall && overall.tier == t;
+        const float cx = x0 + step * (static_cast<float>(t) + 0.5f);
+        if (current) Angled(Rectangle{cx - step * 0.5f + 6.0f, ly - 10.0f, step - 12.0f, 150.0f}, theme::kPanel2, 12.0f);
+        DrawRankBadge(cx, ly + 50.0f, 74.0f, tr, current || !hasOverall ? 1.0f : 0.45f, false);
+        Text(TierName(t), cx, ly + 104.0f, 18.0f, current ? TierColor(t) : theme::kTextDim, Align::Center);
+    }
+
+    if (Button(Rectangle{x0, VH() - 100.0f, 260.0f, 60.0f}, "BACK", true) || IsKeyPressed(KEY_ESCAPE)) {
+        screen_ = Screen::MainMenu;
+    }
+    Text(cfg_.roastMode ? "Roast mode is on (Settings > Gameplay)." : "Roast mode is off (Settings > Gameplay).", x0 + 290.0f,
+         VH() - 80.0f, 18.0f, theme::kTextDim);
 }

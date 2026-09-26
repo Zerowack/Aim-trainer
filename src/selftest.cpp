@@ -186,6 +186,17 @@ bool RunSelfTest(std::string& report) {
         RunRecord mixed = g;
         mixed.mode = ModeId::Mixed;
         c.True("rank: sens finder tests are not ranked", !RankFromRecord(mixed, r));
+        bool allText = true;
+        for (int t = 0; t < kTierCount; ++t) {
+            AimRank tr;
+            tr.tier = t;
+            for (unsigned int seed = 0; seed < 8; ++seed) {
+                const char* roast = RankRoast(tr, seed);
+                allText = allText && roast && roast[0] != '\0';
+            }
+            allText = allText && RankDescription(tr)[0] != '\0';
+        }
+        c.True("rank: every tier has roasts and a description", allText);
     }
 
     // --- Crosshair share code round trip ------------------------------------

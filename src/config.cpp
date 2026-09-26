@@ -91,6 +91,7 @@ bool Config::Load(const std::string& path) {
     targetColor.g = ToByte(GetI(kv, "target_g", targetColor.g));
     targetColor.b = ToByte(GetI(kv, "target_b", targetColor.b));
     mapBrightness = ClampF(GetF(kv, "map_brightness", mapBrightness), 0.2f, 1.6f);
+    roastMode = GetB(kv, "roast_mode", roastMode);
 
     masterVolume = ClampF(GetF(kv, "master_volume", masterVolume), 0.0f, 1.0f);
     hitVolume = ClampF(GetF(kv, "hit_volume", hitVolume), 0.0f, 1.0f);
@@ -129,6 +130,7 @@ bool Config::Save(const std::string& path) const {
     out << "target_g=" << static_cast<int>(targetColor.g) << "\n";
     out << "target_b=" << static_cast<int>(targetColor.b) << "\n";
     out << "map_brightness=" << mapBrightness << "\n";
+    out << "roast_mode=" << (roastMode ? 1 : 0) << "\n";
     out << "master_volume=" << masterVolume << "\n";
     out << "hit_volume=" << hitVolume << "\n";
     out << "key_shoot=" << keys.shoot << "\n";

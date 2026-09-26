@@ -78,6 +78,8 @@ add_executable(Valtrainer WIN32
     src/platform_win32.cpp
     src/rank.cpp
     src/rank.h
+    src/rank_badge.cpp
+    src/rank_badge.h
     src/rng.h
     src/selftest.cpp
     src/selftest.h

@@ -72,6 +72,83 @@ std::string RankLabel(const AimRank& r) {
     return std::string(TierName(r.tier)) + " " + std::to_string(r.division);
 }
 
+const char* RankRoast(const AimRank& r, unsigned int seed) {
+    static const char* const iron[] = {
+        "Your aim is dogshit. The targets are literally standing still, bro.",
+        "Just delete the game, it's not for u lil bro.",
+        "Were you aiming with your monitor turned off?",
+        "Even the practice bots feel bad for you.",
+        "Uninstall. Go outside. Find a new hobby. Maybe knitting.",
+    };
+    static const char* const bronze[] = {
+        "Bronze aim. You shoot like the mouse is upside down.",
+        "Your crosshair has serious commitment issues.",
+        "Hardstuck energy detected. Keep grinding, lil bro.",
+        "You miss more than a stormtrooper at a family reunion.",
+    };
+    static const char* const silver[] = {
+        "Silver: you hit shots... occasionally... mostly by accident.",
+        "Not bad. Not good. Just... there.",
+        "Aim of a Jett main who forgot she can dash.",
+        "The enemy team isn't scared, but they're not laughing either.",
+    };
+    static const char* const gold[] = {
+        "Gold. Perfectly average. The human definition of 'mid'.",
+        "Your aim won't lose you games. It won't win them either.",
+        "Solid. Now stop crouch-spraying across the map.",
+    };
+    static const char* const plat[] = {
+        "Platinum hands. Now fix that crosshair placement.",
+        "Decent. Your teammates might finally stop typing 'diff'.",
+        "You're getting dangerous. Mildly dangerous.",
+    };
+    static const char* const diamond[] = {
+        "Diamond aim. Clean. The enemy is checking your tracker.",
+        "Crisp flicks. Your mouse pad fears you.",
+        "Okay, you're actually good. Don't let it go to your head.",
+    };
+    static const char* const ascendant[] = {
+        "Ascendant aim. Stop playing aim trainers and go rank up.",
+        "Cracked. Someone is typing 'reported' in all chat right now.",
+        "Your aim is doing all the carrying. Hope your brain catches up.",
+    };
+    static const char* const immortal[] = {
+        "Immortal aim. Reported for aimbot, probably.",
+        "Your mouse deserves a raise and paid holidays.",
+        "Heads are just magnets for your crosshair at this point.",
+    };
+    static const char* const radiant[] = {
+        "Radiant aim. Are you a pro or is your crosshair glued to heads?",
+        "Touch grass. Please. You've peaked.",
+        "Absolutely inhuman. Go sign a contract.",
+    };
+    struct List {
+        const char* const* lines;
+        unsigned int count;
+    };
+    static const List lists[kTierCount] = {{iron, 5}, {bronze, 4}, {silver, 4}, {gold, 3}, {plat, 3},
+                                           {diamond, 3}, {ascendant, 3}, {immortal, 3}, {radiant, 3}};
+    const List& l = lists[std::max(0, std::min(kTierCount - 1, r.tier))];
+    // Iron 1 always gets the classic.
+    if (r.tier == 0 && r.division == 1 && (seed % 2u) == 0u) return iron[1];
+    return l.lines[seed % l.count];
+}
+
+const char* RankDescription(const AimRank& r) {
+    static const char* const desc[kTierCount] = {
+        "Getting started. Focus on accuracy first, speed comes later.",
+        "Building basics. Slow down and click only when you're on target.",
+        "Consistent on easy shots. Work on flick distance control.",
+        "Solid, average aim. Tighten up micro-adjustments.",
+        "Above average. Your flicks are reliable.",
+        "Strong aim with good speed and accuracy.",
+        "Excellent aim. Mechanics are rarely your problem.",
+        "Top-tier aim. Fast and precise.",
+        "Elite aim. Pro-level mechanics.",
+    };
+    return desc[std::max(0, std::min(kTierCount - 1, r.tier))];
+}
+
 AimRank RankFromPoints(double points) {
     AimRank r;
     r.points = std::max(0.0, std::min(kRadiantPoints, points));

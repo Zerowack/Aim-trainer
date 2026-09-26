@@ -45,6 +45,7 @@ struct Config {
     int runSeconds = 60;
     Color targetColor = Color{80, 220, 255, 255};
     float mapBrightness = 1.0f;  // 0.2 .. 1.6
+    bool roastMode = true;       // funny rank comments ("your aim is ...")
 
     // Audio
     float masterVolume = 0.8f;

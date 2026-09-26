@@ -214,6 +214,7 @@ void App::Frame() {
         case Screen::FinderComfort: ui::Backdrop(); ScreenFinderComfort(); break;
         case Screen::FinderRound: ui::Backdrop(); ScreenFinderRound(); break;
         case Screen::FinderFinal: ui::Backdrop(); ScreenFinderFinal(); break;
+        case Screen::Rank: ui::Backdrop(); ScreenRank(); break;
     }
     if (screen_ != Screen::Playing) DrawFpsCounter();
 
