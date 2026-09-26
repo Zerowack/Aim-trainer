@@ -27,7 +27,7 @@ void Accelerate(Mover& m, float wishX, float wishZ, float wishSpeed, float dt) {
     } else {
         const float sp = m.Speed();
         if (sp > 0.0f) {
-            const float ns = std::max(0.0f, sp - kFriction * dt);
+            const float ns = std::max(0.0f, sp - (kFrictionExp * sp + kFrictionLinear) * dt);
             m.vel.x *= ns / sp;
             m.vel.z *= ns / sp;
         }

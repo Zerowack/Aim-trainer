@@ -264,7 +264,11 @@ public:
 
     bool HideCrosshair() const override { return zoomLevel_ > 0 || dead_; }
 
+    bool OwnWorld() const override { return true; }
+    Color SkyColor(float b) const override { return Shade(Color{62, 72, 92, 255}, b); }
+
     void Draw3D() const override {
+        ctx_.world->DrawArenaFloor(9.5f, 37.0f, Color{92, 94, 100, 255});
         ctx_.world->DrawCovers();
         // Red line on the floor: the middle of the lane you can't cross.
         ctx_.world->DrawBoxLit(Vector3{0.0f, 0.01f, kPlayerMaxZ - 0.4f}, Vector3{18.0f, 0.02f, 0.08f}, Color{210, 64, 76, 255});
@@ -380,7 +384,14 @@ private:
 
     void BuildArena() {
         std::vector<Box> b;
-        auto add = [&](float x, float z, float sx, float sz, float h) { b.push_back(Box{Vector3{x, h * 0.5f, z}, Vector3{sx, h, sz}}); };
+        CoverStyle style = CoverStyle::Wall;
+        auto add = [&](float x, float z, float sx, float sz, float h) {
+            Box bx;
+            bx.center = Vector3{x, h * 0.5f, z};
+            bx.size = Vector3{sx, h, sz};
+            bx.style = style;
+            b.push_back(bx);
+        };
         // The lane: 18 m wide, ~50 m long.
         add(-9.25f, -10.0f, 0.5f, 50.5f, 4.0f);
         add(9.25f, -10.0f, 0.5f, 50.5f, 4.0f);
@@ -388,11 +399,13 @@ private:
         add(0.0f, -35.25f, 19.0f, 0.5f, 4.0f);
         // Enemy side: the big wall (peeks from both of its sides) and two boxes.
         add(0.0f, -24.0f, 9.0f, 1.4f, 4.0f);
+        style = CoverStyle::Crate;
         add(-6.6f, -12.0f, 3.2f, 2.0f, 2.6f);
         add(6.6f, -7.0f, 3.2f, 2.0f, 2.6f);
         // Your side: two tall boxes to peek from and a low one to crouch behind.
         add(-5.6f, 7.0f, 2.2f, 2.0f, 2.6f);
         add(5.6f, 5.5f, 2.2f, 2.0f, 2.6f);
+        style = CoverStyle::Barrier;
         add(0.0f, 2.5f, 2.6f, 0.9f, 1.05f);
         ctx_.world->SetCovers(b);
         // You can't walk past the middle (an invisible wall that doesn't block shots).

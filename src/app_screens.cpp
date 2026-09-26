@@ -708,17 +708,22 @@ void App::SettingsCrosshair(float x, float y, float /*w*/) {
     // Column 2: inner and outer lines.
     const float x2 = x + colW + 50.0f;
     cy = y;
-    changed |= Toggle(Rectangle{x2, cy, colW, 40.0f}, "Inner lines", &c.innerShow);
+    const float halfW = (colW - 12.0f) * 0.5f;
+    changed |= Toggle(Rectangle{x2, cy, halfW, 40.0f}, "Inner lines", &c.innerShow);
+    changed |= Toggle(Rectangle{x2 + halfW + 12.0f, cy, halfW, 40.0f}, "Firing error", &c.innerFiringError);
     changed |= SliderF(Rectangle{x2, cy + rowH, colW, 46.0f}, "Inner line opacity", &c.innerOpacity, 0.0f, 1.0f, "%.2f");
     changed |= SliderI(Rectangle{x2, cy + 2.0f * rowH, colW, 46.0f}, "Inner line length", &c.innerLength, 0, 20);
-    changed |= SliderI(Rectangle{x2, cy + 3.0f * rowH, colW, 46.0f}, "Inner line thickness", &c.innerThickness, 1, 10);
+    changed |= SliderI(Rectangle{x2, cy + 3.0f * rowH, colW, 46.0f}, "Inner line thickness", &c.innerThickness, 0, 10);
     changed |= SliderI(Rectangle{x2, cy + 4.0f * rowH, colW, 46.0f}, "Inner line offset", &c.innerOffset, 0, 20);
     cy += 5.0f * rowH + 20.0f;
-    changed |= Toggle(Rectangle{x2, cy, colW, 40.0f}, "Outer lines", &c.outerShow);
+    changed |= Toggle(Rectangle{x2, cy, halfW, 40.0f}, "Outer lines", &c.outerShow);
+    changed |= Toggle(Rectangle{x2 + halfW + 12.0f, cy, halfW, 40.0f}, "Firing error", &c.outerFiringError);
     changed |= SliderF(Rectangle{x2, cy + rowH, colW, 46.0f}, "Outer line opacity", &c.outerOpacity, 0.0f, 1.0f, "%.2f");
     changed |= SliderI(Rectangle{x2, cy + 2.0f * rowH, colW, 46.0f}, "Outer line length", &c.outerLength, 0, 20);
-    changed |= SliderI(Rectangle{x2, cy + 3.0f * rowH, colW, 46.0f}, "Outer line thickness", &c.outerThickness, 1, 10);
+    changed |= SliderI(Rectangle{x2, cy + 3.0f * rowH, colW, 46.0f}, "Outer line thickness", &c.outerThickness, 0, 10);
     changed |= SliderI(Rectangle{x2, cy + 4.0f * rowH, colW, 46.0f}, "Outer line offset", &c.outerOffset, 0, 40);
+    changed |= Toggle(Rectangle{x2, cy + 5.0f * rowH + 12.0f, colW, 40.0f}, "Outer lines: movement error", &c.outerMoveError);
+    changed |= Toggle(Rectangle{x2, cy + 6.0f * rowH + 12.0f, colW, 40.0f}, "Fade lines with firing error", &c.fadeWithFiring);
 
     // Column 3: live preview + share code.
     const float x3 = x2 + colW + 50.0f;
@@ -779,10 +784,10 @@ void App::SettingsCrosshair(float x, float y, float /*w*/) {
         xhCodeText_ = EncodeCrosshair(c);
         xhMessage_ = "Reset.";
     }
-    if (!xhMessage_.empty()) TextBlock(xhMessage_, x3, sy + 118.0f, pw, 18.0f, theme::kWarn);
-    TextBlock("Format: XH1; c=RRGGBB colour; o/ot/oa = outline on, thickness, alpha; d/dt/da = center dot; "
-              "i/ia/il/it/io = inner lines on, alpha, length, thickness, offset; x/xa/xl/xt/xo = outer lines.",
-              x3, sy + 175.0f, pw, 16.0f, Alpha(theme::kTextDim, 0.8f));
+    if (!xhMessage_.empty()) TextBlock(xhMessage_, x3, sy + 112.0f, pw, 18.0f, theme::kWarn);
+    TextBlock("Like Valorant: sizes are screen pixels. Lines with firing error sit 4 px further out and spread when you "
+              "shoot (VS Bot); movement error spreads them while you move.",
+              x3, sy + 150.0f, pw, 16.0f, Alpha(theme::kTextDim, 0.8f));
 }
 
 void App::SettingsAudio(float x, float y, float w) {

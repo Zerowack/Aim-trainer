@@ -99,6 +99,13 @@ void ValCamera::Reset(double yawDeg, double pitchDeg) {
     eye_ = Vector3{0.0f, kEyeHeight, 0.0f};
     yaw_ = val::NormalizeDeg(yawDeg);
     pitch_ = pitchDeg;
+    punchYaw_ = 0.0;
+    punchPitch_ = 0.0;
+}
+
+double ValCamera::Pitch() const {
+    const double p = pitch_ + punchPitch_;
+    return p > val::kPitchLimit ? val::kPitchLimit : (p < -val::kPitchLimit ? -val::kPitchLimit : p);
 }
 
 void ValCamera::ApplyCounts(long dx, long dy, double sens) {
@@ -111,7 +118,7 @@ void ValCamera::ApplyCounts(long dx, long dy, double sens) {
 
 Vector3 ValCamera::Eye() const { return eye_; }
 
-Vector3 ValCamera::Forward() const { return DirectionFromAngles(yaw_, pitch_); }
+Vector3 ValCamera::Forward() const { return DirectionFromAngles(Yaw(), Pitch()); }
 
 Ray ValCamera::AimRay() const { return Ray{Eye(), Forward()}; }
 

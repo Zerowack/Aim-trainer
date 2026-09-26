@@ -172,37 +172,37 @@ bool RunSelfTest(std::string& report) {
         RunRecord g;
         g.mode = ModeId::Gridshot;
         g.duration = 60.0;
-        g.hits = 180;  // 3.0 kills/s at 100% = exactly Gold's start
+        g.hits = 228;  // 3.8 kills/s at 100% = exactly Gold's start
         g.accuracy = 100.0;
         AimRank r;
-        c.True("rank: gridshot 3.0 kills/s = Gold 1", RankFromRecord(g, r) && RankLabel(r) == "Gold 1");
+        c.True("rank: gridshot 3.8 kills/s = Gold 1", RankFromRecord(g, r) && RankLabel(r) == "Gold 1");
         g.accuracy = 50.0;  // same kills at half the accuracy = half the value
         c.True("rank: accuracy matters (50% acc drops to Iron)", RankFromRecord(g, r) && r.tier == 0);
-        g.hits = 176;  // the reported run: 176 hits, 91.2% -> 2.68 = Silver 2
+        g.hits = 176;  // the reported run: 176 hits, 91.2% -> 2.68 = Bronze 1
         g.accuracy = 91.2;
-        c.True("rank: 176 hits @ 91% in 60 s = Silver 2", RankFromRecord(g, r) && RankLabel(r) == "Silver 2");
+        c.True("rank: 176 hits @ 91% in 60 s = Bronze 1", RankFromRecord(g, r) && RankLabel(r) == "Bronze 1");
         RunRecord rx;
         rx.mode = ModeId::Reaction;
         rx.duration = 60.0;
         rx.hits = 20;
-        rx.avgReactionMs = 258.0;
-        c.True("rank: reaction 258 ms = Gold 1", RankFromRecord(rx, r) && RankLabel(r) == "Gold 1");
+        rx.avgReactionMs = 248.0;
+        c.True("rank: reaction 248 ms = Gold 1", RankFromRecord(rx, r) && RankLabel(r) == "Gold 1");
         rx.avgReactionMs = 190.0;
         c.True("rank: reaction 190 ms = Radiant", RankFromRecord(rx, r) && RankLabel(r) == "Radiant");
         rx.avgReactionMs = 420.0;
         c.True("rank: reaction 420 ms = Iron", RankFromRecord(rx, r) && r.tier == 0);
-        RunRecord hard = g;  // Silver 2 value at Normal...
-        hard.difficulty = Difficulty::Hard;  // ...x1.25 on Hard: 2.68 * 1.25 = 3.35 -> Gold 3
-        c.True("rank: Hard difficulty is worth more (Silver 2 -> Gold 3)", RankFromRecord(hard, r) && RankLabel(r) == "Gold 3");
+        RunRecord hard = g;  // Bronze 1 value at Normal...
+        hard.difficulty = Difficulty::Hard;  // ...x1.25 on Hard: 2.68 * 1.25 = 3.34 -> Silver 1
+        c.True("rank: Hard difficulty is worth more (Bronze 1 -> Silver 1)", RankFromRecord(hard, r) && RankLabel(r) == "Silver 1");
         RunRecord easy = g;
-        easy.difficulty = Difficulty::Easy;  // x0.75 -> 2.01 = Bronze 1
-        c.True("rank: Easy difficulty is worth less (Silver 2 -> Bronze 1)", RankFromRecord(easy, r) && RankLabel(r) == "Bronze 1");
+        easy.difficulty = Difficulty::Easy;  // x0.75 -> 2.01 = Iron 1
+        c.True("rank: Easy difficulty is worth less (Bronze 1 -> Iron 1)", RankFromRecord(easy, r) && RankLabel(r) == "Iron 1");
         RunRecord pl;
         pl.mode = ModeId::Placement;
         pl.duration = 60.0;
         pl.hits = 20;
-        pl.placementErr = 6.5;  // Gold's start
-        c.True("rank: placement 6.5 deg = Gold 1", RankFromRecord(pl, r) && RankLabel(r) == "Gold 1");
+        pl.placementErr = 5.8;  // Gold's start
+        c.True("rank: placement 5.8 deg = Gold 1", RankFromRecord(pl, r) && RankLabel(r) == "Gold 1");
         pl.placementErr = 1.0;
         c.True("rank: placement 1.0 deg = Radiant", RankFromRecord(pl, r) && RankLabel(r) == "Radiant");
         RunRecord sn;
@@ -219,7 +219,7 @@ bool RunSelfTest(std::string& report) {
         sn.deaths = 2;
         sn.accuracy = 60.0;
         sn.avgTtkMs = 700.0;  // (6 - 1) / 12 x 0.6 x 0.5625 = 0.14
-        c.True("rank: sniper 6/12 with 2 deaths = Bronze 3", RankFromRecord(sn, r) && RankLabel(r) == "Bronze 3");
+        c.True("rank: sniper 6/12 with 2 deaths = Iron 3", RankFromRecord(sn, r) && RankLabel(r) == "Iron 3");
         sn.peeks = -1;  // a run from the old sniper mode
         c.True("rank: old sniper runs are not ranked", !RankFromRecord(sn, r));
         RunRecord shortRun = g;
@@ -270,6 +270,19 @@ bool RunSelfTest(std::string& report) {
         c.True("valorant code: white dot + short thick inner lines at offset 0",
                vok3 && v.r == 255 && v.g == 255 && v.b == 255 && v.centerDot && v.innerThickness == 4 &&
                    v.innerLength == 1 && v.innerOffset == 0 && v.innerOpacity > 0.99f && !v.outerShow && v.outline);
+        c.True("valorant code: firing error off for 0f;0, fade off for f;0", vok3 && !v.innerFiringError && !v.fadeWithFiring);
+        const bool vok4 = DecodeAnyCrosshair("0", v, &err);
+        c.True("valorant default: firing error on (inner + outer), outer movement error, fade",
+               vok4 && v.innerFiringError && v.outerFiringError && v.outerMoveError && !v.innerMoveError && v.fadeWithFiring &&
+                   v.outerShow && v.innerVertLength == 6);
+        const bool vok5 = DecodeAnyCrosshair("0;P;0l;3;0g;1;0v;9;m;1;1b;0", v, &err);
+        c.True("valorant code: separate vertical length + override offset",
+               vok5 && v.innerLength == 3 && v.innerSeparateVert && v.innerVertLength == 9 && v.overrideFiringOffset);
+        Crosshair w = v;
+        Crosshair w2;
+        c.True("crosshair code round trip keeps Valorant extras",
+               DecodeCrosshair(EncodeCrosshair(w), w2, &err) && w2.innerSeparateVert && w2.innerVertLength == 9 &&
+                   w2.overrideFiringOffset && w2.innerFiringError == w.innerFiringError && w2.fadeWithFiring == w.fadeWithFiring);
         c.True("valorant code rejects missing P section", !DecodeValorantCrosshair("0;A;c;1", v, &err));
     }
 

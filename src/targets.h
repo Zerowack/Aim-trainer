@@ -30,6 +30,11 @@ struct Target {
     bool beingHit = false;    // tracking: crosshair on target while firing
     int tag = 0;              // mode specific (e.g. grid cell)
     float crouch = 0.0f;      // humanoids: 0 = standing, 1 = fully crouched
+    // Humanoid pose (drawing only; the hitboxes turn with 'yaw').
+    float yaw = 180.0f;       // facing, camera convention (0 = towards -z, 180 = towards +z)
+    float walkPhase = 0.0f;   // radians, advances with distance walked
+    float moveSpeed = 0.0f;   // m/s, scales the stride
+    float airborne = 0.0f;    // 0 on the ground, 1 in the air (legs tucked)
 };
 
 struct TargetHit {
@@ -48,3 +53,5 @@ Vector3 TargetAimPoint(const Target& t, bool head);
 double TargetAngularRadius(const Target& t, Vector3 eye, bool head);
 
 void DrawTarget(const World& world, const Target& t, Color base);
+// The humanoid agent model on its own (used by DrawTarget).
+void DrawAgent(const World& world, const Target& t, Color base);

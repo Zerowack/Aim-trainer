@@ -4,6 +4,8 @@
 // paused time removed, so pausing never affects reaction time or TTK.
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -112,6 +114,16 @@ public:
     // Replace the run timer in the HUD (VS Bot shows the round timer and
     // score instead). Return false to use the normal timer.
     virtual bool HudTimer(double /*t*/, double& /*secondsLeft*/, std::string& /*label*/) const { return false; }
+    // Modes with their own map (VS Bot) skip the shooting range and use their
+    // own background colour.
+    virtual bool OwnWorld() const { return false; }
+    virtual Color SkyColor(float brightness) const { return Shade(Color{22, 25, 32, 255}, brightness); }
+    // Current weapon error for a Valorant-style dynamic crosshair (degrees):
+    // spread from shooting and from moving. 0 = the crosshair stays static.
+    virtual void CrosshairError(double /*t*/, double& firingDeg, double& movingDeg) const {
+        firingDeg = 0.0;
+        movingDeg = 0.0;
+    }
     // Mode specific HUD (virtual UI coordinates, see ui.h).
     virtual void DrawHud(double t) const;
 
@@ -143,6 +155,12 @@ protected:
     Vector3 PointFromAngles(double yawDeg, double pitchDeg, double dist) const;
     void DrawOffscreenArrow(const Target& target) const;
     void UpdateTracking(const Target& target, double dt, bool triggerHeld, bool& onTarget);
+    // Tracking points: +100 per second on target while firing, -60 per
+    // second firing off target (holding fire all the time doesn't pay).
+    long long TrackingScore() const {
+        const double off = std::max(0.0, stats_.trackHeldTime - stats_.trackOnTime);
+        return std::max<long long>(0, static_cast<long long>(std::lround(stats_.trackOnTime * 100.0 - off * 60.0)));
+    }
 
     ModeId id_;
     GameContext ctx_;

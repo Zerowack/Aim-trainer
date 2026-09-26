@@ -17,15 +17,17 @@ Valorant:
   Crosshair Placement and Sniper, each with Easy / Normal / Hard / Insane difficulty. Sniper is an
   angle-holding scenario (Marshal / Outlaw / Operator) where enemies swing, jump, crouch and jiggle peek and you move and
   shoot like in Valorant. The **scoped sensitivity multiplier** works like Valorant's.
-- **VS Bot:** a 1v1 duel in a box arena against a bot from Iron to Radiant. You move like in
-  Valorant: run, walk, crouch, jump, counter-strafe, with movement inaccuracy and a rifle spray.
+- **VS Bot:** a 1v1 Sheriff duel on a skirmish-style map against a bot from Iron to Radiant. You move
+  like in Valorant: run, walk, crouch, jump and counter-strafe, with movement inaccuracy, visible
+  recoil and a first-person pistol.
 - **Sens Finder:** uses the Perfect Sensitivity Approximation (PSA) method. It runs 7 rounds of blind A/B
   tests, draws a graph of your results, and has a one-click "apply" button. Every session
   is saved and combined into an average across days.
 - **Stats:** after each run you get score, accuracy, reaction time, time-to-kill (TTK), and your
   overshoot/undershoot tendency, plus a coaching tip (e.g. *"You overshoot flicks, try
   lowering sens ~5%"*). Per-mode progress graphs and personal bests are included.
-- **Crosshair editor:** Valorant-style, with a live preview. You can **paste your Valorant crosshair share code** to import it. You can
+- **Crosshair editor:** Valorant-style, with a live preview. You can **paste your Valorant crosshair share code** to import it,
+  including firing / movement error, separate vertical lengths and fading. You can
   also change target colour, map brightness, volume and keybinds.
 
 No Riot logos, fonts or assets are used. The UI uses the Windows system font
@@ -227,9 +229,11 @@ mode, use **MINIMIZE** on the main menu or in the pause menu, or press Alt-Tab o
    - The sniper rank is the share of peeks you killed (deaths count against you) × accuracy × speed
      (time to kill after the enemy showed up). Sniper runs from before v1.9 are not ranked.
 
-9. **VS Bot**: a skirmish-style 1v1 against a bot in an arena full of boxes. Tall boxes are full
-   cover; low boxes let you crouch behind them with your head still showing. First pick the bot's
-   rank (Iron → Radiant, keys 1–9). The match is first to 5 rounds, with 60 s per round and a 2.5 s freeze time.
+9. **VS Bot**: a skirmish-style 1v1 **Sheriff duel** on a small map built like a Valorant skirmish
+   arena. It has concrete walls, lane walls, a centre crate stack, crates and low barriers. The map
+   is point-symmetric, so both sides are the same. Both spawns sit behind a wall with side wings,
+   so you never start face to face. First pick the bot's rank (Iron → Radiant, keys 1–9). The match
+   is first to 5 rounds, with 60 s per round and a 3 s freeze time.
 
    | Action | Key |
    |---|---|
@@ -238,26 +242,33 @@ mode, use **MINIMIZE** on the main menu or in the pause menu, or press Alt-Tab o
    | Crouch | Ctrl (hold) |
    | Jump | Space |
    | Reload | R |
-   | Shoot (full auto) | Mouse 1 (hold) |
+   | Shoot (semi-auto) | Mouse 1 (one shot per click) |
 
-   The mechanics copy Valorant's (numbers are close approximations, not Riot data):
-   - **Movement:** run 5.4 m/s, walk 2.9 m/s, crouch 1.9 m/s. Acceleration and stopping are very fast.
-     Pressing the opposite key (**counter-strafe**) stops you faster than letting go.
-     Crouching lowers your eye from 1.6 m to 1.12 m in 0.12 s.
-   - **Accuracy:** you are only accurate below ~1.35 m/s. Running adds up to +5° of spread and
-     jumping about 8°. Crouching while standing still is a bit tighter. The hint under the
-     crosshair tells you ACCURATE / MOVING / AIRBORNE.
-   - **Rifle (Vandal-like):** 9.75 rounds/s, 25-round magazine, 2.5 s reload. Damage is 160 head
-     (one-tap), 40 body, 34 legs. The spray kicks upward for the first ~8 bullets and then sways
-     sideways; tap or burst to reset it (0.35 s).
-   - **Health:** 100 HP + 50 shield (150 total).
+   The mechanics follow Valorant. Values Valorant publishes are used exactly (Sheriff stats, run
+   speed, the accuracy threshold); the rest are close approximations:
+   - **Sheriff:** 4 shots/s, 6-round magazine, 2.25 s reload. Damage 159 head / 55 body / 46 legs
+     up to 30 m, then 145 / 50 / 42. That's a one-tap headshot through 150 HP (100 + 50 shields)
+     within 30 m.
+   - **Recoil moves your view:** each shot kicks the view (and the crosshair) up about 2.2°, and it
+     recovers over ~0.3 s. The bullet always goes where the crosshair shows, plus spread. Spread grows
+     ~1.1° per shot and resets if you wait, so tap, don't spam.
+   - **Movement:** run 5.4 m/s, walk 2.9 m/s, crouch 1.9 m/s. You're accurate at or below 27.5% of run
+     speed (1.485 m/s). A counter-strafe (tap the opposite key) gets you there in ~70 ms; just letting
+     go takes ~100 ms. Running adds up to +3° of spread and jumping +5°.
+   - **Bodies:** the agent model is built to match its hitboxes (head, torso, arms and weapon, legs;
+     crouching lowers the head and pushes the knees forward), and they turn with the agent. What you
+     see is what you hit. Your own crouched eye height matches the model's crouched head.
+   - **Crosshair:** your crosshair's firing-error and movement-error lines spread with the Sheriff's
+     real spread, like in Valorant.
 
-   The bot sees you only with line of sight inside its 110° view cone, and hears you run within 20 m.
-   Higher ranks react faster (Iron ~540 ms → Radiant ~165 ms), turn faster, and correct their aim
-   quicker. They also aim more at heads, counter-strafe before shooting instead of running and gunning,
-   control recoil, and ADAD or crouch between bursts. If nobody meets for a while, the bot hunts you.
-   The results screen shows rounds, K/D, headshot %, accuracy, reaction time, TTK, damage, and how many
-   of your shots were fired while moving (the #1 thing to fix). VS Bot matches are **unranked**: they don't count towards your aim rank.
+   The bot walks a navigation graph around the walls. It sees you only with line of sight inside its
+   110° view cone, and hears you run within 20 m. Higher ranks react faster (Iron ~540 ms → Radiant
+   ~165 ms), turn faster, and correct their aim quicker. They also aim more at heads, counter-strafe
+   before shooting, space their taps so the spread resets, and ADAD or crouch between taps. Early in
+   the round they hold angles; later they push, and if nobody meets for a while they hunt you. The
+   results screen shows rounds, K/D, headshot %, accuracy, reaction time, TTK, damage, and how many of
+   your shots were fired while moving. VS Bot matches are **unranked**: they don't count towards your
+   aim rank.
 
 **Scoped sensitivity:** Settings → Sensitivity → *Scoped sensitivity multiplier* is the same
 setting as Valorant's (Settings → General → Mouse). While scoped, each mouse count turns
@@ -279,6 +290,13 @@ and average ms for Reaction. A mode's rank is the median of its last 5 runs. You
 rank on the main menu averages all modes you've played (at least 3 are needed). This
 estimates **aim only**: real rank also depends on game sense, utility and teamwork, and the
 tier cut-offs are calibrated estimates, not official Riot data.
+
+The cut-offs are strict (v2.0 raised them about 20–30%). Gold in Gridshot needs 3.8 kills/s at 100%
+accuracy (228 hits in 60 s), and Radiant needs 7.2. Tracking multiplies time on target by how much
+of your firing was on target, so holding the trigger the whole run doesn't pay.
+
+**Scoring:** a miss costs half a kill (−50) in the click modes, so spam-clicking never beats clean
+shots. Tracking gives +100 per second on target while firing and −60 per second firing off target.
 
 Click the rank panel on the main menu for the **Rank screen**: a big emblem for your
 overall rank, your rank in every mode, and the full tier ladder. Every tier has its own
@@ -364,8 +382,15 @@ In Valorant open **Settings → Crosshair → Crosshair Profile → Export**. Th
 a code like `0;P;c;5;h;0;f;0;0l;4;0o;2;0a;1;0f;0;1b;0`. In Valtrainer go to
 **Settings → Crosshair**, click **PASTE** (or click the code box and press Ctrl+V), then
 click **IMPORT**. Valtrainer imports the primary crosshair: colour (including custom
-colours), outlines, centre dot, and inner and outer lines. Valorant-only extras such as
-firing/movement error, separate vertical length, and the ADS and sniper crosshairs are ignored.
+colours), outlines, centre dot, and inner and outer lines with Valorant's extra settings:
+- Separate vertical length (`0g`/`0v`).
+- Firing error (`0f`/`1f`, on by default, as in Valorant). A line set with firing error sits 4 px further
+  out, unless "override firing error offset" (`m`) is on, and spreads with the weapon's firing error.
+- Movement error (`0m`/`1m`, on by default for outer lines).
+- The error multipliers (`0e`/`0s`/`1e`/`1s`) and "fade crosshair with firing error" (`f`).
+
+Sizes are drawn in raw screen pixels exactly like Valorant, which doesn't scale the crosshair with
+resolution. The ADS and sniper crosshairs are ignored.
 
 ### Valtrainer crosshair code format
 

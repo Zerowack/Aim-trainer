@@ -441,11 +441,13 @@ void App::UpdatePlaying(const std::vector<platform::RawEvent>& events, double no
 
 void App::DrawPlaying() {
     const float b = cfg_.mapBrightness;
-    ClearBackground(world_.SkyColor(b));
+    const bool ownWorld = mode_ && mode_->OwnWorld();
+    ClearBackground(ownWorld ? mode_->SkyColor(b) : world_.SkyColor(b));
 
     BeginMode3D(cam_.ToRaylib(mode_ ? mode_->Zoom() : 1.0));
     world_.BeginFrame(cam_.Eye(), b);
-    world_.DrawRange();
+    if (ownWorld) world_.SetFog(mode_->SkyColor(b), 0.012f);
+    else world_.DrawRange();
     if (mode_) mode_->Draw3D();
     fx_.Draw(world_);
     EndMode3D();
@@ -453,7 +455,16 @@ void App::DrawPlaying() {
     const double g = clock_.Game(platform::Now());
     if (mode_) mode_->DrawOverlay();
     DrawHud(g);
-    if (!mode_ || !mode_->HideCrosshair()) DrawCrosshair(cfg_.crosshair, GetScreenWidth() / 2, GetScreenHeight() / 2);
+    if (!mode_ || !mode_->HideCrosshair()) {
+        // Valorant-style dynamic crosshair: weapon error in degrees -> pixels.
+        double fireDeg = 0.0, moveDeg = 0.0;
+        if (mode_ && live_) mode_->CrosshairError(g, fireDeg, moveDeg);
+        const double halfFov = val::DegToRad(val::ZoomedVerticalFov(mode_ ? mode_->Zoom() : 1.0) * 0.5);
+        const double pxPerTan = GetScreenHeight() * 0.5 / std::tan(halfFov);
+        const float firePx = static_cast<float>(std::tan(val::DegToRad(fireDeg)) * pxPerTan);
+        const float movePx = static_cast<float>(std::tan(val::DegToRad(moveDeg)) * pxPerTan);
+        DrawCrosshair(cfg_.crosshair, GetScreenWidth() / 2, GetScreenHeight() / 2, 1, firePx, movePx);
+    }
     DrawHitFeedback(g);
     if (paused_) DrawPauseMenu();
 }

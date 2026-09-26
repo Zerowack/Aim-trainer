@@ -19,16 +19,18 @@ namespace mv {
 constexpr float kRunSpeed = 5.40f;     // rifle running speed
 constexpr float kWalkSpeed = 2.90f;    // Shift-walk (silent)
 constexpr float kCrouchSpeed = 1.90f;  // crouch-walk
-constexpr float kAccel = 55.0f;        // with input: full speed in ~0.1 s, counter-strafe stop in ~0.1 s
-constexpr float kFriction = 28.0f;     // keys released: stop from a run in ~0.2 s
+constexpr float kAccel = 55.0f;        // with input: full speed in ~0.1 s; a counter-strafe gets you
+                                       // accurate in ~70 ms (measured in Valorant)
+constexpr float kFrictionLinear = 28.6f;  // keys released: dv/dt = -(3.3 v + 28.6), accurate after ~100 ms
+constexpr float kFrictionExp = 3.3f;
 constexpr float kAirAccel = 8.0f;
 constexpr float kJumpSpeed = 5.2f;
 constexpr float kGravity = 15.0f;
 constexpr float kStandEye = 1.60f;
-constexpr float kCrouchEye = 1.12f;
+constexpr float kCrouchEye = 1.18f;  // matches the crouched head of the agent model
 constexpr float kCrouchRate = 1.0f / 0.12f;  // full crouch in 0.12 s
 constexpr float kRadius = 0.35f;
-constexpr float kAccurateSpeed = 1.35f;  // at or below this the first shot is accurate (~25% of run speed)
+constexpr float kAccurateSpeed = 1.485f;  // at or below this the first shot is accurate (27.5% of run speed)
 constexpr float kFootstepSpeed = 3.2f;   // faster than walking = audible footsteps
 
 // Something that walks around: feet position, velocity, crouch amount.

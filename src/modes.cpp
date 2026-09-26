@@ -139,7 +139,8 @@ void Mode::OnHit(size_t index, const TargetHit& hit, double /*t*/) {
 }
 
 void Mode::OnMiss(double /*t*/) {
-    stats_.score -= 25;
+    // Half a kill: spamming clicks never beats clean shots.
+    stats_.score -= 50;
     ctx_.audio->Play(Sfx::Miss);
 }
 
@@ -458,7 +459,7 @@ public:
         bool on = false;
         UpdateTracking(tg, dt, triggerHeld, on);
         tg.beingHit = on;
-        stats_.score = static_cast<long long>(std::lround(stats_.trackOnTime * 100.0));
+        stats_.score = TrackingScore();
     }
 
     void OnShot(double /*t*/) override {}  // tracking is scored by time, not clicks
@@ -937,7 +938,7 @@ public:
                 SpawnForSegment();
             }
         }
-        stats_.score = stats_.hits * 100 + static_cast<long long>(std::lround(stats_.trackOnTime * 100.0));
+        stats_.score = stats_.hits * 100 + TrackingScore();
     }
 
     void OnShot(double t) override {

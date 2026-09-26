@@ -84,8 +84,15 @@ public:
     // dx > 0 turns right, dy > 0 (mouse pulled toward you) looks down.
     void ApplyCounts(long dx, long dy, double sens);
 
-    double Yaw() const { return yaw_; }
-    double Pitch() const { return pitch_; }
+    // View angles including recoil kick (what you see and shoot along).
+    double Yaw() const { return val::NormalizeDeg(yaw_ + punchYaw_); }
+    double Pitch() const;
+    // Recoil "view punch" on top of the mouse-driven angles (VS Bot pistol).
+    // The mode sets it every frame; everything else leaves it at zero.
+    void SetPunch(double yawDeg, double pitchDeg) {
+        punchYaw_ = yawDeg;
+        punchPitch_ = pitchDeg;
+    }
     Vector3 Eye() const;
     Vector3 Forward() const;
     Ray AimRay() const;
@@ -95,6 +102,8 @@ private:
     Vector3 eye_ = {0.0f, kEyeHeight, 0.0f};
     double yaw_ = 0.0;    // degrees, 0 = looking down -Z, positive = right
     double pitch_ = 0.0;  // degrees, positive = up
+    double punchYaw_ = 0.0;
+    double punchPitch_ = 0.0;
 };
 
 // Direction helpers (degrees).

@@ -27,6 +27,24 @@ struct Crosshair {
     int outerLength = 2;
     int outerThickness = 2;
     int outerOffset = 10;
+
+    // Valorant's extra line settings. The lines move outwards with the
+    // weapon's firing / movement error; with firing error on they also sit
+    // 4 px further out at rest, unless 'overrideFiringOffset' is set.
+    bool innerSeparateVert = false;  // vertical arms use innerVertLength
+    int innerVertLength = 6;
+    bool innerFiringError = false;
+    bool innerMoveError = false;
+    float innerFireMult = 1.0f;
+    float innerMoveMult = 1.0f;
+    bool outerSeparateVert = false;
+    int outerVertLength = 2;
+    bool outerFiringError = false;
+    bool outerMoveError = false;
+    float outerFireMult = 1.0f;
+    float outerMoveMult = 1.0f;
+    bool overrideFiringOffset = false;
+    bool fadeWithFiring = false;  // lines with firing error fade as they spread
 };
 
 // Clamps every field into its valid range.
@@ -40,15 +58,17 @@ bool DecodeCrosshair(const std::string& code, Crosshair& out, std::string* error
 
 // Valorant in-game share code (Settings > Crosshair > Import/Export), e.g.
 //   0;P;c;5;h;0;f;0;0l;4;0o;2;0a;1;0f;0;1b;0
-// Only the primary crosshair ("P" section) is used. Settings this trainer
-// has no equivalent for (firing/movement error, separate vertical length,
-// ADS and sniper crosshairs) are ignored.
+// Only the primary crosshair ("P" section) is used, including firing /
+// movement error, separate vertical lengths and fading. ADS and sniper
+// crosshairs are ignored.
 bool DecodeValorantCrosshair(const std::string& code, Crosshair& out, std::string* error);
 
 // Accepts either format: tries the Valorant code first when it looks like
 // one (starts with "0;"), otherwise the XH1 format.
 bool DecodeAnyCrosshair(const std::string& code, Crosshair& out, std::string* error);
 
-// Draws the crosshair centred on pixel (cx, cy). 'scale' enlarges it for the
-// editor preview (1 = real size).
-void DrawCrosshair(const Crosshair& c, int cx, int cy, int scale = 1);
+// Draws the crosshair centred on pixel (cx, cy). Sizes are screen pixels,
+// exactly like Valorant (no resolution scaling). 'scale' enlarges it for the
+// editor preview (1 = real size). firePx / movePx: the weapon's current
+// firing and movement error in pixels, for lines that show them.
+void DrawCrosshair(const Crosshair& c, int cx, int cy, int scale = 1, float firePx = 0.0f, float movePx = 0.0f);

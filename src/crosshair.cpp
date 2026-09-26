@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -23,18 +24,25 @@ struct Piece {
     unsigned char alpha;
 };
 
-void AddLines(std::vector<Piece>& out, int cx, int cy, int length, int thickness, int offset,
+void AddLines(std::vector<Piece>& out, int cx, int cy, int length, int vertLength, int thickness, int offset,
               unsigned char alpha) {
-    if (length <= 0 || thickness <= 0) return;
+    if (thickness <= 0 || alpha == 0) return;
     // Like Valorant, the offset is measured from the exact centre of the
     // screen: with offset 0 the four lines meet in the middle. Across the
     // line, the thickness is centred on the centre pixel.
     const int across = -(thickness / 2);  // first pixel across the line
-    out.push_back({cx + offset, cy + across, length, thickness, alpha});           // right
-    out.push_back({cx - offset - length, cy + across, length, thickness, alpha});  // left
-    out.push_back({cx + across, cy + offset, thickness, length, alpha});           // down
-    out.push_back({cx + across, cy - offset - length, thickness, length, alpha});  // up
+    if (length > 0) {
+        out.push_back({cx + offset, cy + across, length, thickness, alpha});           // right
+        out.push_back({cx - offset - length, cy + across, length, thickness, alpha});  // left
+    }
+    if (vertLength > 0) {
+        out.push_back({cx + across, cy + offset, thickness, vertLength, alpha});           // down
+        out.push_back({cx + across, cy - offset - vertLength, thickness, vertLength, alpha});  // up
+    }
 }
+
+// Valorant's firing-error lines sit this much further out at rest.
+constexpr int kFiringErrorGap = 4;
 
 std::string Lower(std::string s) {
     for (char& ch : s) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
@@ -79,12 +87,18 @@ void ClampCrosshair(Crosshair& c) {
     c.dotOpacity = ClampF(c.dotOpacity, 0.0f, 1.0f);
     c.innerOpacity = ClampF(c.innerOpacity, 0.0f, 1.0f);
     c.innerLength = ClampI(c.innerLength, 0, 20);
-    c.innerThickness = ClampI(c.innerThickness, 1, 10);
+    c.innerVertLength = ClampI(c.innerVertLength, 0, 20);
+    c.innerThickness = ClampI(c.innerThickness, 0, 10);
     c.innerOffset = ClampI(c.innerOffset, 0, 20);
     c.outerOpacity = ClampF(c.outerOpacity, 0.0f, 1.0f);
     c.outerLength = ClampI(c.outerLength, 0, 20);
-    c.outerThickness = ClampI(c.outerThickness, 1, 10);
+    c.outerVertLength = ClampI(c.outerVertLength, 0, 20);
+    c.outerThickness = ClampI(c.outerThickness, 0, 10);
     c.outerOffset = ClampI(c.outerOffset, 0, 40);
+    c.innerFireMult = ClampF(c.innerFireMult, 0.0f, 3.0f);
+    c.innerMoveMult = ClampF(c.innerMoveMult, 0.0f, 3.0f);
+    c.outerFireMult = ClampF(c.outerFireMult, 0.0f, 3.0f);
+    c.outerMoveMult = ClampF(c.outerMoveMult, 0.0f, 3.0f);
 }
 
 std::string EncodeCrosshair(const Crosshair& c) {
@@ -97,7 +111,26 @@ std::string EncodeCrosshair(const Crosshair& c) {
                   static_cast<double>(c.innerOpacity), c.innerLength, c.innerThickness, c.innerOffset,
                   c.outerShow ? 1 : 0, static_cast<double>(c.outerOpacity), c.outerLength, c.outerThickness,
                   c.outerOffset);
-    return buf;
+    std::string code = buf;
+    // Valorant extras, only written when they differ from the defaults.
+    const Crosshair d;
+    auto add = [&](const char* key, const std::string& v) { code += std::string(";") + key + "=" + v; };
+    auto num = [](double v) { char b[32]; std::snprintf(b, sizeof(b), "%.2f", v); return std::string(b); };
+    if (c.innerSeparateVert != d.innerSeparateVert) add("ig", c.innerSeparateVert ? "1" : "0");
+    if (c.innerVertLength != d.innerVertLength) add("iv", std::to_string(c.innerVertLength));
+    if (c.innerFiringError != d.innerFiringError) add("ife", c.innerFiringError ? "1" : "0");
+    if (c.innerMoveError != d.innerMoveError) add("ime", c.innerMoveError ? "1" : "0");
+    if (c.innerFireMult != d.innerFireMult) add("ifm", num(c.innerFireMult));
+    if (c.innerMoveMult != d.innerMoveMult) add("imm", num(c.innerMoveMult));
+    if (c.outerSeparateVert != d.outerSeparateVert) add("xg", c.outerSeparateVert ? "1" : "0");
+    if (c.outerVertLength != d.outerVertLength) add("xv", std::to_string(c.outerVertLength));
+    if (c.outerFiringError != d.outerFiringError) add("xfe", c.outerFiringError ? "1" : "0");
+    if (c.outerMoveError != d.outerMoveError) add("xme", c.outerMoveError ? "1" : "0");
+    if (c.outerFireMult != d.outerFireMult) add("xfm", num(c.outerFireMult));
+    if (c.outerMoveMult != d.outerMoveMult) add("xmm", num(c.outerMoveMult));
+    if (c.overrideFiringOffset != d.overrideFiringOffset) add("ov", c.overrideFiringOffset ? "1" : "0");
+    if (c.fadeWithFiring != d.fadeWithFiring) add("fd", c.fadeWithFiring ? "1" : "0");
+    return code;
 }
 
 bool DecodeCrosshair(const std::string& codeIn, Crosshair& out, std::string* error) {
@@ -156,6 +189,20 @@ bool DecodeCrosshair(const std::string& codeIn, Crosshair& out, std::string* err
         else if (key == "xl") ok = ParseInt(val, c.outerLength);
         else if (key == "xt") ok = ParseInt(val, c.outerThickness);
         else if (key == "xo") ok = ParseInt(val, c.outerOffset);
+        else if (key == "ig") ok = ParseBool(val, c.innerSeparateVert);
+        else if (key == "iv") ok = ParseInt(val, c.innerVertLength);
+        else if (key == "ife") ok = ParseBool(val, c.innerFiringError);
+        else if (key == "ime") ok = ParseBool(val, c.innerMoveError);
+        else if (key == "ifm") ok = ParseFloat(val, c.innerFireMult);
+        else if (key == "imm") ok = ParseFloat(val, c.innerMoveMult);
+        else if (key == "xg") ok = ParseBool(val, c.outerSeparateVert);
+        else if (key == "xv") ok = ParseInt(val, c.outerVertLength);
+        else if (key == "xfe") ok = ParseBool(val, c.outerFiringError);
+        else if (key == "xme") ok = ParseBool(val, c.outerMoveError);
+        else if (key == "xfm") ok = ParseFloat(val, c.outerFireMult);
+        else if (key == "xmm") ok = ParseFloat(val, c.outerMoveMult);
+        else if (key == "ov") ok = ParseBool(val, c.overrideFiringOffset);
+        else if (key == "fd") ok = ParseBool(val, c.fadeWithFiring);
         else return fail("Unknown key '" + key + "'.");
         if (!ok) return fail("Bad value '" + val + "' for key '" + key + "'.");
         if (next >= code.size()) break;
@@ -192,6 +239,11 @@ bool DecodeValorantCrosshair(const std::string& codeIn, Crosshair& out, std::str
     c.centerDot = false; c.dotThickness = 2; c.dotOpacity = 1.0f;
     c.innerShow = true; c.innerOpacity = 0.8f; c.innerLength = 6; c.innerThickness = 2; c.innerOffset = 3;
     c.outerShow = true; c.outerOpacity = 0.35f; c.outerLength = 2; c.outerThickness = 2; c.outerOffset = 10;
+    c.innerSeparateVert = false; c.innerVertLength = 6; c.innerFiringError = true; c.innerMoveError = false;
+    c.outerSeparateVert = false; c.outerVertLength = 2; c.outerFiringError = true; c.outerMoveError = true;
+    c.innerFireMult = c.innerMoveMult = c.outerFireMult = c.outerMoveMult = 1.0f;
+    c.overrideFiringOffset = false; c.fadeWithFiring = true;
+    bool innerVertSet = false, outerVertSet = false;
 
     // Valorant's colour presets (c;0..7); c;8 = custom colour from "u".
     static const unsigned char kPresets[8][3] = {{255, 255, 255}, {0, 255, 0},   {127, 255, 0}, {223, 255, 0},
@@ -238,11 +290,27 @@ bool DecodeValorantCrosshair(const std::string& codeIn, Crosshair& out, std::str
         else if (key == "1l") { ok = ParseInt(val, iv); c.outerLength = iv; }
         else if (key == "1o") { ok = ParseInt(val, iv); c.outerOffset = iv; }
         else if (key == "1a") { ok = ParseFloat(val, fv); c.outerOpacity = fv; }
-        // Anything else (firing/movement error, vertical length, ...) has no
-        // equivalent here and is skipped.
+        else if (key == "0g") { ok = ParseBool(val, bv); c.innerSeparateVert = bv; }
+        else if (key == "0v") { ok = ParseInt(val, iv); c.innerVertLength = iv; innerVertSet = true; }
+        else if (key == "0f") { ok = ParseBool(val, bv); c.innerFiringError = bv; }
+        else if (key == "0m") { ok = ParseBool(val, bv); c.innerMoveError = bv; }
+        else if (key == "0e") { ok = ParseFloat(val, fv); c.innerFireMult = fv; }
+        else if (key == "0s") { ok = ParseFloat(val, fv); c.innerMoveMult = fv; }
+        else if (key == "1g") { ok = ParseBool(val, bv); c.outerSeparateVert = bv; }
+        else if (key == "1v") { ok = ParseInt(val, iv); c.outerVertLength = iv; outerVertSet = true; }
+        else if (key == "1f") { ok = ParseBool(val, bv); c.outerFiringError = bv; }
+        else if (key == "1m") { ok = ParseBool(val, bv); c.outerMoveError = bv; }
+        else if (key == "1e") { ok = ParseFloat(val, fv); c.outerFireMult = fv; }
+        else if (key == "1s") { ok = ParseFloat(val, fv); c.outerMoveMult = fv; }
+        else if (key == "m") { ok = ParseBool(val, bv); c.overrideFiringOffset = bv; }
+        else if (key == "f") { ok = ParseBool(val, bv); c.fadeWithFiring = bv; }
+        // Anything else (e.g. "s" advanced options) doesn't change the look.
         if (!ok) return fail("Bad value '" + val + "' for '" + key + "'.");
     }
     if (!sawPrimary && tok.size() > 1) return fail("No primary crosshair (\"P\") section in the code.");
+    // Without its own value the vertical length follows the horizontal one.
+    if (!innerVertSet) c.innerVertLength = c.innerLength;
+    if (!outerVertSet) c.outerVertLength = c.outerLength;
 
     if (colorIndex == 8 && customHex.size() >= 6) {
         char* end = nullptr;
@@ -270,19 +338,38 @@ bool DecodeAnyCrosshair(const std::string& code, Crosshair& out, std::string* er
     return DecodeCrosshair(t, out, error);
 }
 
-void DrawCrosshair(const Crosshair& cIn, int cx, int cy, int scale) {
+void DrawCrosshair(const Crosshair& cIn, int cx, int cy, int scale, float firePx, float movePx) {
     Crosshair c = cIn;
     ClampCrosshair(c);
     if (scale < 1) scale = 1;
+    firePx = std::max(0.0f, firePx);
+    movePx = std::max(0.0f, movePx);
+
+    // Gap of one line set: its offset, plus Valorant's error behaviour.
+    auto gapFor = [&](int offset, bool fireErr, float fireMult, bool moveErr, float moveMult) {
+        float g = static_cast<float>(offset);
+        if (fireErr) g += (c.overrideFiringOffset ? 0.0f : static_cast<float>(kFiringErrorGap)) + firePx * fireMult;
+        if (moveErr) g += movePx * moveMult;
+        return static_cast<int>(std::lround(g * static_cast<float>(scale)));
+    };
+    auto alphaFor = [&](float opacity, bool fireErr) {
+        float a = opacity;
+        if (c.fadeWithFiring && fireErr) a *= std::max(0.0f, 1.0f - firePx / 12.0f);
+        return AlphaFrom(a);
+    };
 
     std::vector<Piece> pieces;
     if (c.innerShow) {
-        AddLines(pieces, cx, cy, c.innerLength * scale, c.innerThickness * scale, c.innerOffset * scale,
-                 AlphaFrom(c.innerOpacity));
+        AddLines(pieces, cx, cy, c.innerLength * scale, (c.innerSeparateVert ? c.innerVertLength : c.innerLength) * scale,
+                 c.innerThickness * scale,
+                 gapFor(c.innerOffset, c.innerFiringError, c.innerFireMult, c.innerMoveError, c.innerMoveMult),
+                 alphaFor(c.innerOpacity, c.innerFiringError));
     }
     if (c.outerShow) {
-        AddLines(pieces, cx, cy, c.outerLength * scale, c.outerThickness * scale, c.outerOffset * scale,
-                 AlphaFrom(c.outerOpacity));
+        AddLines(pieces, cx, cy, c.outerLength * scale, (c.outerSeparateVert ? c.outerVertLength : c.outerLength) * scale,
+                 c.outerThickness * scale,
+                 gapFor(c.outerOffset, c.outerFiringError, c.outerFireMult, c.outerMoveError, c.outerMoveMult),
+                 alphaFor(c.outerOpacity, c.outerFiringError));
     }
     if (c.centerDot) {
         const int t = c.dotThickness * scale;
