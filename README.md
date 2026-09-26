@@ -1,6 +1,8 @@
-# RawAim: an aim trainer calibrated for Valorant
+<p align="center"><img src="assets/icon.png" width="128" alt="Valtrainer icon"></p>
 
-RawAim is a native Windows aim trainer written in C++17 with raylib. It reads your
+# Valtrainer: an aim trainer calibrated for Valorant
+
+Valtrainer is a native Windows aim trainer written in C++17 with raylib. It reads your
 mouse through the **Windows Raw Input API**, so your aim feels exactly like in
 Valorant:
 
@@ -29,7 +31,7 @@ No Riot logos, fonts or assets are used. The UI uses the Windows system font
 ## Just want to play? Download it
 
 Open the repository's **Releases** page (right-hand side on GitHub), download
-**`RawAim-windows-x64.zip`**, extract it and double-click `RawAim.exe`. No
+**`Valtrainer-windows-x64.zip`**, extract it and double-click `Valtrainer.exe`. No
 install is needed. Every release is built automatically by GitHub Actions with
 Visual Studio (MSVC), with warnings treated as errors and the math self-test run.
 
@@ -66,8 +68,8 @@ compiler) and **CMake** (the build system). raylib is downloaded automatically.
 ### 3. Get the code
 
 - On the GitHub page click **Code → Download ZIP**, then extract it to a simple
-  path such as `C:\RawAim`.
-  *(Or, if you use git: `git clone <repo-url> C:\RawAim`.)*
+  path such as `C:\Valtrainer`.
+  *(Or, if you use git: `git clone <repo-url> C:\Valtrainer`.)*
 
 The folder should contain `CMakeLists.txt`, `README.md` and a `src` folder.
 
@@ -80,7 +82,7 @@ Developer PowerShell is the safest choice.)
 Go to the project folder:
 
 ```powershell
-cd C:\RawAim
+cd C:\Valtrainer
 ```
 
 ### 5. Configure (only needed once)
@@ -91,7 +93,7 @@ cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 
 The first time, this downloads raylib 5.5 from GitHub, so you need an
 internet connection. It takes about a minute. It is finished when you see
-`-- Build files have been written to: C:/RawAim/build`.
+`-- Build files have been written to: C:/Valtrainer/build`.
 
 ### 6. Build in Release mode
 
@@ -106,10 +108,10 @@ The first build compiles raylib as well and takes 1–2 minutes. Later builds ar
 The program is here:
 
 ```
-C:\RawAim\build\Release\RawAim.exe
+C:\Valtrainer\build\Release\Valtrainer.exe
 ```
 
-Double-click it, or run `.\build\Release\RawAim.exe` in the terminal.
+Double-click it, or run `.\build\Release\Valtrainer.exe` in the terminal.
 The .exe is self-contained (the C++ runtime is linked statically). You can copy it
 anywhere, for example to your desktop. It stores its files **next to the .exe**:
 
@@ -127,7 +129,7 @@ anywhere, for example to your desktop. It stores its files **next to the .exe**:
 
 ```powershell
 cmake --build build --config Debug
-.\build\Debug\RawAim.exe
+.\build\Debug\Valtrainer.exe
 ```
 
 Debug builds run a self-test at startup that checks the sensitivity, cm/360,
@@ -135,7 +137,7 @@ FOV, camera, PSA and crosshair-code math against known answers. The result is sh
 the bottom of the main menu ("math self-test PASSED"). If anything fails, a
 message box lists the failing checks.
 
-You can also run `build\Debug\RawAimSelfTest.exe` (or the Release one) in the
+You can also run `build\Debug\ValtrainerSelfTest.exe` (or the Release one) in the
 terminal. It prints every check without opening a window.
 
 ### Troubleshooting
@@ -149,16 +151,16 @@ terminal. It prints every check without opening a window.
   delete the `build` folder and run step 5 again.
 - **FPS stuck at 60/144/240 even with "Uncapped"**: your GPU driver forces
   V-Sync or a frame limit. In the NVIDIA Control Panel or AMD Software, set
-  V-Sync to "Off / application controlled" for RawAim.exe.
+  V-Sync to "Off / application controlled" for Valtrainer.exe.
 - **Starting over**: delete the `build` folder and repeat steps 5–6.
   To reset settings, delete `config.ini` next to the .exe.
 
 ---
 
-## Using RawAim
+## Using Valtrainer
 
 **First launch:** enter your mouse DPI and your current Valorant sensitivity.
-RawAim shows your eDPI (`DPI × sens`) and cm/360
+Valtrainer shows your eDPI (`DPI × sens`) and cm/360
 (`360 / (DPI × sens × 0.07) × 2.54`).
 
 **Controls (defaults, rebindable in Settings → Keybinds):**
@@ -248,19 +250,22 @@ Copy the new value into Valorant to keep both games the same. Everything is appe
 | `src/crosshair.h`, `src/crosshair.cpp` | crosshair drawing and share codes |
 | `src/ui.h`, `src/ui.cpp` | dark, sharp-angled immediate-mode UI and charts |
 | `src/audio.h`, `src/audio.cpp` | sound effects synthesised at startup |
+| `src/effects.h`, `src/effects.cpp` | hit particles (cosmetic only) |
+| `src/selftest_main.cpp` | console runner for the self-test (`ValtrainerSelfTest.exe`) |
+| `assets/icon.svg`, `assets/valtrainer.ico`, `assets/valtrainer.rc` | app icon (source + Windows icon) and version info |
 | `src/rng.h` | random numbers |
 | `src/selftest.h`, `src/selftest.cpp` | startup math self-test (Debug builds) |
 
 ### Importing your Valorant crosshair
 
 In Valorant open **Settings → Crosshair → Crosshair Profile → Export**. This copies
-a code like `0;P;c;5;h;0;f;0;0l;4;0o;2;0a;1;0f;0;1b;0`. In RawAim go to
+a code like `0;P;c;5;h;0;f;0;0l;4;0o;2;0a;1;0f;0;1b;0`. In Valtrainer go to
 **Settings → Crosshair**, click **PASTE** (or click the code box and press Ctrl+V), then
-click **IMPORT**. RawAim imports the primary crosshair: colour (including custom
+click **IMPORT**. Valtrainer imports the primary crosshair: colour (including custom
 colours), outlines, centre dot, and inner and outer lines. Valorant-only extras such as
 firing/movement error, separate vertical length, and the ADS and sniper crosshairs are ignored.
 
-### RawAim crosshair code format
+### Valtrainer crosshair code format
 
 ```
 XH1;c=00FF00;o=1;ot=1;oa=0.50;d=0;dt=2;da=1.00;i=1;ia=0.80;il=6;it=2;io=3;x=0;xa=0.35;xl=2;xt=2;xo=10

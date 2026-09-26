@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdint>
+#include <unordered_map>
 
 namespace ui {
 
@@ -31,6 +33,9 @@ float g_vh = 1080.0f;
 int g_focusedBox = -1;          // TextBox id with keyboard focus
 bool g_selectAll = false;       // focused box has "everything selected"
 const void* g_activeSlider = nullptr;
+
+// Hover animation state, keyed by widget position.
+std::unordered_map<uint64_t, float> g_hoverAnim;
 
 constexpr float kBaseW = 1600.0f;
 constexpr float kBaseH = 1080.0f;
@@ -159,13 +164,68 @@ void Title(const std::string& s, float x, float y, float size) {
     const float h = size * 0.9f;
     Tri(Vector2{x, y + h}, Vector2{x + h * 0.35f, y + 2.0f}, Vector2{x + h * 0.55f, y + 2.0f}, theme::kAccent);
     Tri(Vector2{x, y + h}, Vector2{x + h * 0.55f, y + 2.0f}, Vector2{x + h * 0.2f, y + h}, theme::kAccent);
-    Text(s, x + h * 0.75f, y, size, theme::kText);
+    TextBold(s, x + h * 0.75f, y, size, theme::kText);
+}
+
+void TextBold(const std::string& s, float x, float y, float size, Color c, Align a) {
+    // Faux bold: the Windows UI fonts ship as a single weight here.
+    const float off = std::max(1.0f / g_scale, size * 0.035f);
+    Text(s, x, y, size, c, a);
+    Text(s, x + off, y, size, c, a);
+}
+
+void Circle(Vector2 center, float radius, Color c) { DrawCircleV(ToScreen(center), Px(radius), c); }
+
+void CircleLines(Vector2 center, float radius, float thickness, Color c) {
+    const Vector2 s = ToScreen(center);
+    DrawRing(s, Px(radius) - std::max(1.0f, Px(thickness)), Px(radius), 0.0f, 360.0f, 48, c);
+}
+
+void Logo(float x, float y, float size) {
+    // Mirrors assets/icon.svg (designed on a 512 grid).
+    const float k = size / 512.0f;
+    auto P = [&](float px, float py) { return Vector2{x + px * k, y + py * k}; };
+    auto R = [&](float px, float py, float w, float h) { return Rectangle{x + px * k, y + py * k, w * k, h * k}; };
+    // Tile with cut corners + red border.
+    const Rectangle tile = R(16, 16, 480, 480);
+    Angled(tile, theme::kAccent, 84.0f * k);
+    Angled(Rectangle{tile.x + 10.0f * k, tile.y + 10.0f * k, tile.width - 20.0f * k, tile.height - 20.0f * k},
+           Color{24, 28, 37, 255}, 80.0f * k);
+    // Slash.
+    const Color slash = {190, 52, 64, 255};
+    Tri(P(118, 440), P(196, 440), P(394, 72), slash);
+    Tri(P(118, 440), P(394, 72), P(316, 72), slash);
+    // Crosshair with dark outline.
+    const Color dark = {13, 15, 20, 255};
+    Fill(R(220, 62, 72, 140), dark);
+    Fill(R(220, 310, 72, 140), dark);
+    Fill(R(62, 220, 140, 72), dark);
+    Fill(R(310, 220, 140, 72), dark);
+    Fill(R(216, 216, 80, 80), dark);
+    Fill(R(232, 74, 48, 116), theme::kText);
+    Fill(R(232, 322, 48, 116), theme::kText);
+    Fill(R(74, 232, 116, 48), theme::kText);
+    Fill(R(322, 232, 116, 48), theme::kText);
+    Fill(R(228, 228, 56, 56), theme::kAccent);
+}
+
+float HoverAnim(Rectangle r, bool enabled) {
+    const uint64_t key = (static_cast<uint64_t>(static_cast<uint32_t>(std::lround(r.x))) << 32) ^
+                         static_cast<uint64_t>(static_cast<uint32_t>(std::lround(r.y * 3.0f + r.width)));
+    float& v = g_hoverAnim[key];
+    const float target = (enabled && Hover(r)) ? 1.0f : 0.0f;
+    const float step = std::min(1.0f, GetFrameTime() * 14.0f);
+    v += (target - v) * step;
+    if (g_hoverAnim.size() > 4096) g_hoverAnim.clear();  // screen layouts change; keep it small
+    return v;
 }
 
 void Backdrop() {
     ClearBackground(theme::kBg);
-    // Faint diagonal stripes for a bit of texture.
     const float w = VW(), h = VH();
+    // Soft vertical gradient: slightly lighter at the top.
+    DrawRectangleGradientV(0, 0, GetScreenWidth(), GetScreenHeight(), Color{23, 27, 36, 255}, Color{11, 12, 16, 255});
+    // Faint diagonal stripes for a bit of texture.
     const Color stripe = Alpha(theme::kAccent, 0.05f);
     for (int i = 0; i < 6; ++i) {
         const float x = w * 0.62f + static_cast<float>(i) * 120.0f;
@@ -180,11 +240,14 @@ void Backdrop() {
 
 bool Button(Rectangle r, const std::string& label, bool primary, bool enabled) {
     const bool hover = enabled && Hover(r);
+    const float a = HoverAnim(r, enabled);
     Color fill = primary ? theme::kAccent : theme::kPanel2;
     if (!enabled) fill = Alpha(theme::kPanel2, 0.5f);
-    else if (hover) fill = primary ? Lerp(theme::kAccent, WHITE, 0.15f) : Lerp(theme::kPanel2, theme::kLine, 0.6f);
+    else fill = primary ? Lerp(theme::kAccent, WHITE, 0.16f * a) : Lerp(theme::kPanel2, theme::kLine, 0.65f * a);
     Angled(r, fill, 10.0f);
-    if (hover && !primary) Fill(Rectangle{r.x, r.y + r.height - 3.0f, r.width - 10.0f, 3.0f}, theme::kAccent);
+    // Red underline slides in from the left on hover.
+    if (!primary && a > 0.01f) Fill(Rectangle{r.x, r.y + r.height - 3.0f, (r.width - 10.0f) * a, 3.0f}, theme::kAccent);
+    if (primary && a > 0.01f) Border(Rectangle{r.x, r.y, r.width, r.height}, 1.0f, Alpha(WHITE, 0.25f * a));
     const float size = std::min(26.0f, r.height * 0.5f);
     Text(label, r.x + r.width * 0.5f, r.y + (r.height - size) * 0.5f, size,
          enabled ? theme::kText : theme::kTextDim, Align::Center);
@@ -427,7 +490,7 @@ void StatTile(Rectangle r, const std::string& title, const std::string& value, C
     Angled(r, theme::kPanel, 12.0f);
     Fill(Rectangle{r.x, r.y, 4.0f, r.height - 12.0f}, accent);
     Text(title, r.x + 18.0f, r.y + 12.0f, 18.0f, theme::kTextDim);
-    Text(value, r.x + 18.0f, r.y + 38.0f, 34.0f, theme::kText);
+    TextBold(value, r.x + 18.0f, r.y + 38.0f, 34.0f, theme::kText);
 }
 
 // ---------------------------------------------------------------------------

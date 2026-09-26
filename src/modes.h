@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "audio.h"
+#include "effects.h"
 #include "camera.h"
 #include "raylib.h"
 #include "rng.h"
@@ -22,6 +23,7 @@ struct GameContext {
     World* world = nullptr;
     Audio* audio = nullptr;
     Rng* rng = nullptr;
+    Effects* fx = nullptr;  // optional cosmetic effects
     Color targetColor = Color{80, 220, 255, 255};
     float brightness = 1.0f;  // map brightness (targets are never dimmed)
 };
@@ -29,6 +31,14 @@ struct GameContext {
 // ADAD strafing movement shared by Tracking and the sens finder test.
 // Mimics Valorant: ~5.4 m/s run speed, very fast acceleration, random timing,
 // occasional counter-strafe stops.
+// What the last shot did, for HUD feedback (hit marker, points pop-up).
+struct ShotFeedback {
+    double time = -100.0;  // game time of the shot
+    bool hit = false;
+    bool head = false;
+    long long points = 0;  // score change caused by the shot
+};
+
 struct Strafer {
     float x = 0.0f;
     float v = 0.0f;
@@ -68,6 +78,9 @@ public:
 
     RunStats& Stats() { return stats_; }
     const RunStats& Stats() const { return stats_; }
+    const ShotFeedback& LastShot() const { return lastShot_; }
+    int Streak() const { return streak_; }
+    int BestStreak() const { return bestStreak_; }
 
 protected:
     // A shot hit targets_[index]. Default: score, sound, remove the target.
@@ -104,6 +117,10 @@ protected:
     double reactionArmTime_ = 0.0;
 
     double trackTickTimer_ = 0.0;
+
+    ShotFeedback lastShot_;
+    int streak_ = 0;      // hits in a row
+    int bestStreak_ = 0;
 };
 
 std::unique_ptr<Mode> CreateMode(ModeId id, const GameContext& ctx);

@@ -84,6 +84,7 @@ void Mode::OnShot(double t) {
     }
 
     stats_.shots++;
+    const long long scoreBefore = stats_.score;
     const int aimed = best >= 0 ? best : FindAimedTarget();
     if (aimed >= 0) AnalyzeShot(targets_[static_cast<size_t>(aimed)], t);
 
@@ -96,11 +97,25 @@ void Mode::OnShot(double t) {
             stats_.ttkSumMs += ttk;
             stats_.ttkCount++;
         }
+        if (ctx_.fx) {
+            const Vector3 p = {ray.position.x + ray.direction.x * bestHit.distance,
+                               ray.position.y + ray.direction.y * bestHit.distance,
+                               ray.position.z + ray.direction.z * bestHit.distance};
+            const Color c = bestHit.head ? Color{255, 236, 190, 255} : ctx_.targetColor;
+            ctx_.fx->Burst(p, c, bestHit.head ? 22 : 14, bestHit.head ? 5.0f : 3.8f, *ctx_.rng);
+        }
         OnHit(static_cast<size_t>(best), bestHit, t);
         lastKillTime_ = t;
+        ++streak_;
+        if (streak_ > bestStreak_) bestStreak_ = streak_;
     } else {
         OnMiss(t);
+        streak_ = 0;
     }
+    lastShot_.time = t;
+    lastShot_.hit = best >= 0;
+    lastShot_.head = best >= 0 && bestHit.head;
+    lastShot_.points = stats_.score - scoreBefore;
     MarkFlickStart();
 }
 
@@ -645,7 +660,7 @@ public:
     }
 
     void Draw3D() const override {
-        ctx_.world->DrawCovers(ctx_.brightness);
+        ctx_.world->DrawCovers();
         Mode::Draw3D();
     }
 

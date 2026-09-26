@@ -48,13 +48,13 @@ bool App::Init() {
     platform::EnableDpiAwareness();
     SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);  // no FLAG_VSYNC_HINT: vsync stays off
-    InitWindow(cfg_.windowWidth, cfg_.windowHeight, "RawAim - Valorant-calibrated aim trainer");
+    InitWindow(cfg_.windowWidth, cfg_.windowHeight, "Valtrainer - Valorant-calibrated aim trainer");
     if (!IsWindowReady()) return false;
     SetExitKey(KEY_NULL);  // Esc pauses instead of quitting
 
     rawInputOk_ = platform::Init(GetWindowHandle());
     if (!rawInputOk_) {
-        platform::ShowErrorBox("RawAim", "Could not register for Raw Input. Mouse movement will not work.");
+        platform::ShowErrorBox("Valtrainer", "Could not register for Raw Input. Mouse movement will not work.");
     }
 
     ApplyDisplayMode();
@@ -73,7 +73,7 @@ bool App::Init() {
     selfTestRan_ = true;
     selfTestOk_ = RunSelfTest(selfTestReport_);
     TraceLog(selfTestOk_ ? LOG_INFO : LOG_ERROR, "%s", selfTestReport_.c_str());
-    if (!selfTestOk_) platform::ShowErrorBox("RawAim self-test FAILED", selfTestReport_.c_str());
+    if (!selfTestOk_) platform::ShowErrorBox("Valtrainer self-test FAILED", selfTestReport_.c_str());
 #endif
 
     screen_ = cfg_.firstRunDone ? Screen::MainMenu : Screen::FirstRun;
@@ -216,6 +216,17 @@ void App::Frame() {
         case Screen::FinderFinal: ui::Backdrop(); ScreenFinderFinal(); break;
     }
     if (screen_ != Screen::Playing) DrawFpsCounter();
+
+    // Quick fade whenever the screen changes.
+    if (screen_ != lastScreen_) {
+        lastScreen_ = screen_;
+        screenChangedAt_ = platform::Now();
+    }
+    const double sinceChange = platform::Now() - screenChangedAt_;
+    if (screenChangedAt_ >= 0.0 && sinceChange < 0.18) {
+        const float a = static_cast<float>(1.0 - sinceChange / 0.18);
+        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), ui::Alpha(ui::theme::kBg, 0.7f * a * a));
+    }
     EndDrawing();
 
     // 6) Targets drawn for the first time become "visible" now, after the
@@ -247,6 +258,7 @@ void App::StartRun(ModeId id, bool finderTest) {
     ctx.world = &world_;
     ctx.audio = &audio_;
     ctx.rng = &rng_;
+    ctx.fx = &fx_;
     ctx.targetColor = cfg_.targetColor;
     ctx.brightness = cfg_.mapBrightness;
 
@@ -256,6 +268,7 @@ void App::StartRun(ModeId id, bool finderTest) {
     finderRun_ = finderTest;
     cam_.Reset(0.0, 0.0);
     history_.Clear();
+    fx_.Clear();
     triggerHeld_ = false;
 
     clock_ = GameClock{};
@@ -294,6 +307,7 @@ void App::EndRun() {
     lastWasPb_ = !hadPreviousBest_ || s.score > previousBest_;
     stats_.Append(MakeRecord(s, cfg_.sens, cfg_.dpi));
     lastStats_ = s;
+    resultsShownAt_ = platform::Now();
     lastTips_ = BuildTips(s, cfg_.sens);
 
     // Optional: let the coach apply its over/undershoot sens suggestion.
@@ -383,6 +397,7 @@ void App::UpdatePlaying(const std::vector<platform::RawEvent>& events, double no
     }
 
     mode_->Update(g, dt, triggerHeld_);
+    fx_.Update(dt);
     if (g - runStart_ >= runLength_) EndRun();
 }
 
@@ -391,17 +406,19 @@ void App::UpdatePlaying(const std::vector<platform::RawEvent>& events, double no
 
 void App::DrawPlaying() {
     const float b = cfg_.mapBrightness;
-    ClearBackground(Shade(Color{28, 31, 38, 255}, b));
+    ClearBackground(world_.SkyColor(b));
 
     BeginMode3D(cam_.ToRaylib());
-    world_.SetViewPosition(cam_.Eye());
-    world_.DrawRange(b);
+    world_.BeginFrame(cam_.Eye(), b);
+    world_.DrawRange();
     if (mode_) mode_->Draw3D();
+    fx_.Draw(world_);
     EndMode3D();
 
     const double g = clock_.Game(platform::Now());
     DrawHud(g);
     DrawCrosshair(cfg_.crosshair, GetScreenWidth() / 2, GetScreenHeight() / 2);
+    DrawHitFeedback(g);
     if (paused_) DrawPauseMenu();
 }
 
@@ -412,41 +429,92 @@ void App::DrawFpsCounter() {
     ui::Text(s, 22.0f, 17.0f, 18.0f, ui::theme::kGood);
 }
 
+void App::DrawHitFeedback(double g) {
+    if (!mode_ || !live_ || paused_) return;
+    const ShotFeedback& fb = mode_->LastShot();
+    const double dt = g - fb.time;
+    if (!fb.hit || dt < 0.0 || dt > 0.14) return;
+    // Hit marker: four short diagonal ticks around the crosshair.
+    const float a = static_cast<float>(1.0 - dt / 0.14);
+    const float s = std::max(1.0f, ui::Scale() * 1.4f);
+    const float in = 8.0f * s, out = 15.0f * s, th = std::max(2.0f, 1.8f * s);
+    const Vector2 c = {static_cast<float>(GetScreenWidth() / 2) + 0.5f, static_cast<float>(GetScreenHeight() / 2) + 0.5f};
+    const Color col = fb.head ? Color{255, 90, 100, static_cast<unsigned char>(255 * a)}
+                              : Color{255, 255, 255, static_cast<unsigned char>(230 * a)};
+    for (int i = 0; i < 4; ++i) {
+        const float dx = (i & 1) ? 1.0f : -1.0f, dy = (i & 2) ? 1.0f : -1.0f;
+        const float k = 0.70710678f;
+        DrawLineEx(Vector2{c.x + dx * in * k, c.y + dy * in * k}, Vector2{c.x + dx * out * k, c.y + dy * out * k}, th, col);
+    }
+}
+
 void App::DrawHud(double g) {
     using namespace ui;
     const float vw = VW(), vh = VH();
+    const float cx = vw * 0.5f, cy = vh * 0.5f;
 
     DrawFpsCounter();
 
     if (mode_) {
         const RunStats& s = mode_->Stats();
-        // Timer
+
+        // Timer with a progress bar; the last 5 seconds pulse red.
         const double left = live_ ? std::max(0.0, runLength_ - (g - runStart_)) : runLength_;
         const int secs = static_cast<int>(std::ceil(left));
-        Angled(Rectangle{vw * 0.5f - 90.0f, 14.0f, 180.0f, 64.0f}, Alpha(BLACK, 0.5f), 12.0f);
-        Text(TextFormat("%d:%02d", secs / 60, secs % 60), vw * 0.5f, 20.0f, 40.0f, theme::kText, Align::Center);
-        Text(ModeName(currentMode_), vw * 0.5f, 84.0f, 18.0f, Alpha(theme::kTextDim, 0.9f), Align::Center);
+        const bool finalSeconds = live_ && left <= 5.0 && left > 0.0;
+        const Rectangle tb = {cx - 110.0f, 14.0f, 220.0f, 74.0f};
+        Angled(tb, Alpha(theme::kBg, 0.78f), 14.0f);
+        const float frac = runLength_ > 0.0 ? static_cast<float>(left / runLength_) : 0.0f;
+        Fill(Rectangle{tb.x + 16.0f, tb.y + tb.height - 12.0f, tb.width - 32.0f, 3.0f}, Alpha(theme::kLine, 0.8f));
+        Fill(Rectangle{tb.x + 16.0f, tb.y + tb.height - 12.0f, (tb.width - 32.0f) * frac, 3.0f},
+             finalSeconds ? theme::kAccent : theme::kText);
+        const bool blink = finalSeconds && std::fmod(left, 1.0) > 0.5;
+        TextBold(TextFormat("%d:%02d", secs / 60, secs % 60), cx, 20.0f, 40.0f, blink ? theme::kAccent : theme::kText,
+                 Align::Center);
+        Text(ModeName(currentMode_), cx, 96.0f, 17.0f, Alpha(theme::kTextDim, 0.9f), Align::Center);
 
-        // Score block (top right)
+        // Score block (top right) with a red accent edge.
         const float rx = vw - 300.0f;
-        Angled(Rectangle{rx, 14.0f, 286.0f, 112.0f}, Alpha(BLACK, 0.5f), 12.0f);
-        Text(TextFormat("%lld", std::max<long long>(0, s.score)), rx + 270.0f, 20.0f, 40.0f, theme::kText, Align::Right);
-        Text("SCORE", rx + 16.0f, 32.0f, 18.0f, theme::kAccent);
+        const Rectangle sb = {rx, 14.0f, 286.0f, 112.0f};
+        Angled(sb, Alpha(theme::kBg, 0.78f), 14.0f);
+        Fill(Rectangle{sb.x, sb.y, 4.0f, sb.height - 14.0f}, theme::kAccent);
+        TextBold(TextFormat("%lld", std::max<long long>(0, s.score)), rx + 270.0f, 20.0f, 40.0f, theme::kText, Align::Right);
+        Text("SCORE", rx + 18.0f, 32.0f, 18.0f, theme::kAccent);
         if (currentMode_ == ModeId::Tracking) {
-            Text(TextFormat("ON TARGET %.0f%%", (s.TrackingPct() > 0 ? s.TrackingPct() : 0.0) * 100.0), rx + 16.0f, 78.0f,
+            Text(TextFormat("ON TARGET %.0f%%", (s.TrackingPct() > 0 ? s.TrackingPct() : 0.0) * 100.0), rx + 18.0f, 80.0f,
                  20.0f, theme::kTextDim);
         } else {
-            Text(TextFormat("ACC %.0f%%   %d / %d", s.Accuracy() * 100.0, s.hits, s.Misses()), rx + 16.0f, 78.0f, 20.0f,
+            Text(TextFormat("ACC %.0f%%   %d / %d", s.Accuracy() * 100.0, s.hits, s.Misses()), rx + 18.0f, 80.0f, 20.0f,
                  theme::kTextDim);
         }
+        // Hit streak.
+        const int streak = mode_->Streak();
+        if (live_ && streak >= 3) {
+            const Rectangle st = {rx + 126.0f, 134.0f, 160.0f, 36.0f};
+            Angled(st, Alpha(theme::kAccent, 0.85f), 10.0f);
+            TextBold(TextFormat("STREAK x%d", streak), st.x + st.width * 0.5f, st.y + 7.0f, 20.0f, theme::kText, Align::Center);
+        }
 
-        if (live_) mode_->DrawHud(g);
-
-        if (!live_) {
-            const int c = static_cast<int>(std::ceil(countdownEnd_ - g));
-            Text(TextFormat("%d", std::max(1, c)), vw * 0.5f, vh * 0.5f - 150.0f, 110.0f, theme::kAccent, Align::Center);
-            Text(finderRun_ ? TextFormat("TEST %c - GET READY", finder_.CurrentLabel()) : "GET READY", vw * 0.5f,
-                 vh * 0.5f + 60.0f, 24.0f, theme::kText, Align::Center);
+        if (live_) {
+            mode_->DrawHud(g);
+            // Points pop-up that rises and fades next to the crosshair.
+            const ShotFeedback& fb = mode_->LastShot();
+            const double dt = g - fb.time;
+            if (fb.hit && fb.points > 0 && dt >= 0.0 && dt < 0.6) {
+                const float t = static_cast<float>(dt / 0.6);
+                Text(TextFormat("+%lld", fb.points), cx + 46.0f, cy - 34.0f - 46.0f * t, 26.0f,
+                     Alpha(fb.head ? theme::kWarn : theme::kText, 1.0f - t * t));
+            }
+        } else {
+            // Countdown: each number starts big and settles.
+            const double remaining = countdownEnd_ - g;
+            const int c = std::max(1, static_cast<int>(std::ceil(remaining)));
+            const float f = static_cast<float>(remaining - std::floor(remaining));  // 1 -> 0 within each second
+            const float size = 110.0f * (1.0f + 0.3f * f * f);
+            TextBold(TextFormat("%d", c), cx, cy - 150.0f - (size - 110.0f) * 0.5f, size, Alpha(theme::kAccent, 0.55f + 0.45f * (1.0f - f)),
+                     Align::Center);
+            Text(finderRun_ ? TextFormat("TEST %c - GET READY", finder_.CurrentLabel()) : "GET READY", cx, cy + 60.0f, 24.0f,
+                 theme::kText, Align::Center);
         }
     }
 

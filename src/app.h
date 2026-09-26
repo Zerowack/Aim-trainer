@@ -8,12 +8,15 @@
 #include "audio.h"
 #include "camera.h"
 #include "config.h"
+#include "effects.h"
 #include "modes.h"
 #include "platform.h"
 #include "rng.h"
 #include "sens_finder.h"
 #include "stats.h"
 #include "world.h"
+
+constexpr const char* kAppVersion = "1.2.0";
 
 // Game clock = real time minus all time spent paused.
 struct GameClock {
@@ -77,6 +80,7 @@ private:
     void DrawPlaying();
     void DrawHud(double gameTime);
     void DrawPauseMenu();
+    void DrawHitFeedback(double gameTime);
 
     // --- screens (app_screens.cpp)
     void ScreenFirstRun();
@@ -108,6 +112,7 @@ private:
     AimHistory history_;
     Rng rng_;
     std::unique_ptr<Mode> mode_;
+    Effects fx_;
 
     // --- run state
     Screen screen_ = Screen::MainMenu;
@@ -134,6 +139,7 @@ private:
     double autoSensBefore_ = 0.0;
     int autoSensPct_ = 0;
     bool hadPreviousBest_ = false;
+    double resultsShownAt_ = 0.0;   // for the score count-up animation
 
     // --- sens finder
     SensFinder finder_;
@@ -170,4 +176,6 @@ private:
     std::string selfTestReport_;
     bool rawInputOk_ = true;
     bool quit_ = false;
+    Screen lastScreen_ = Screen::MainMenu;
+    double screenChangedAt_ = -1.0;  // for the fade between screens
 };

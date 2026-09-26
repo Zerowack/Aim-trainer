@@ -17,6 +17,13 @@ constexpr float kContentWidth = 1500.0f;
 
 float ContentX() { return (VW() - kContentWidth) * 0.5f; }
 
+Color Lerp2(Color a, Color b, float k) {
+    auto l = [k](unsigned char x, unsigned char y) {
+        return static_cast<unsigned char>(static_cast<float>(x) + (static_cast<float>(y) - static_cast<float>(x)) * k);
+    };
+    return Color{l(a.r, b.r), l(a.g, b.g), l(a.b, b.b), l(a.a, b.a)};
+}
+
 std::string Fmt(double v, int decimals) {
     char buf[64];
     std::snprintf(buf, sizeof(buf), "%.*f", decimals, v);
@@ -35,15 +42,74 @@ bool ParseNumber(const std::string& s, double minV, double maxV, double& out) {
     return true;
 }
 
-// Clickable card with a title, description and a footer line.
-bool Card(Rectangle r, const std::string& title, const std::string& desc, const std::string& footer, int index) {
+// Small line-art icon for each training mode, centred on (cx, cy).
+void DrawModeIcon(ModeId m, float cx, float cy, float s, Color c) {
+    const float t = 3.0f;  // stroke width
+    switch (m) {
+        case ModeId::Gridshot:
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 3; ++j) Circle(Vector2{cx + static_cast<float>(i - 1) * s * 0.36f, cy + static_cast<float>(j - 1) * s * 0.36f}, s * 0.05f, Alpha(c, 0.35f));
+            Circle(Vector2{cx - s * 0.36f, cy - s * 0.36f}, s * 0.13f, c);
+            Circle(Vector2{cx + s * 0.36f, cy}, s * 0.13f, c);
+            Circle(Vector2{cx, cy + s * 0.36f}, s * 0.13f, c);
+            break;
+        case ModeId::Microshot:
+            CircleLines(Vector2{cx, cy}, s * 0.36f, t, Alpha(c, 0.5f));
+            Line(Vector2{cx - s * 0.5f, cy}, Vector2{cx - s * 0.2f, cy}, t, c);
+            Line(Vector2{cx + s * 0.2f, cy}, Vector2{cx + s * 0.5f, cy}, t, c);
+            Line(Vector2{cx, cy - s * 0.5f}, Vector2{cx, cy - s * 0.2f}, t, c);
+            Line(Vector2{cx, cy + s * 0.2f}, Vector2{cx, cy + s * 0.5f}, t, c);
+            Circle(Vector2{cx, cy}, s * 0.07f, c);
+            break;
+        case ModeId::Tracking:
+            Circle(Vector2{cx, cy - s * 0.3f}, s * 0.1f, c);
+            Fill(Rectangle{cx - s * 0.1f, cy - s * 0.17f, s * 0.2f, s * 0.5f}, c);
+            Tri(Vector2{cx - s * 0.5f, cy}, Vector2{cx - s * 0.28f, cy - s * 0.13f}, Vector2{cx - s * 0.28f, cy + s * 0.13f}, Alpha(c, 0.7f));
+            Tri(Vector2{cx + s * 0.5f, cy}, Vector2{cx + s * 0.28f, cy - s * 0.13f}, Vector2{cx + s * 0.28f, cy + s * 0.13f}, Alpha(c, 0.7f));
+            break;
+        case ModeId::Flick180: {
+            // Half-circle arrow.
+            const int n = 14;
+            Vector2 prev = {cx - s * 0.38f, cy + s * 0.08f};
+            for (int i = 1; i <= n; ++i) {
+                const float a = 3.14159265f * static_cast<float>(i) / static_cast<float>(n);
+                const Vector2 p = {cx - s * 0.38f * std::cos(a), cy + s * 0.08f - s * 0.38f * std::sin(a)};
+                Line(prev, p, t, c);
+                prev = p;
+            }
+            Tri(Vector2{prev.x, prev.y + s * 0.22f}, Vector2{prev.x - s * 0.13f, prev.y - s * 0.02f},
+                Vector2{prev.x + s * 0.13f, prev.y - s * 0.02f}, c);
+            Circle(Vector2{cx - s * 0.38f, cy + s * 0.08f}, s * 0.07f, Alpha(c, 0.6f));
+            break;
+        }
+        case ModeId::Reaction:
+            // Lightning bolt.
+            Tri(Vector2{cx + s * 0.12f, cy - s * 0.5f}, Vector2{cx - s * 0.26f, cy + s * 0.06f}, Vector2{cx + s * 0.02f, cy + s * 0.06f}, c);
+            Tri(Vector2{cx - s * 0.02f, cy - s * 0.06f}, Vector2{cx + s * 0.26f, cy - s * 0.06f}, Vector2{cx - s * 0.12f, cy + s * 0.5f}, c);
+            break;
+        case ModeId::Peek:
+            // Agent half hidden behind a wall.
+            Circle(Vector2{cx + s * 0.08f, cy - s * 0.2f}, s * 0.1f, c);
+            Fill(Rectangle{cx - s * 0.02f, cy - s * 0.07f, s * 0.2f, s * 0.5f}, c);
+            Fill(Rectangle{cx - s * 0.5f, cy - s * 0.35f, s * 0.46f, s * 0.8f}, Alpha(c, 0.35f));
+            break;
+        default:
+            break;
+    }
+}
+
+// Clickable card with a title, description, footer line and mode icon.
+bool Card(Rectangle r, ModeId mode, const std::string& title, const std::string& desc, const std::string& footer, int index) {
     const bool hover = Hover(r);
-    Angled(r, hover ? theme::kPanel2 : theme::kPanel, 16.0f);
-    Fill(Rectangle{r.x, r.y, 5.0f, r.height - 16.0f}, hover ? theme::kAccent : theme::kAccentDim);
-    Text(TextFormat("%02d", index), r.x + r.width - 24.0f, r.y + 16.0f, 22.0f, Alpha(theme::kTextDim, 0.6f), Align::Right);
-    Text(title, r.x + 24.0f, r.y + 16.0f, 30.0f, theme::kText);
-    TextBlock(desc, r.x + 24.0f, r.y + 56.0f, r.width - 48.0f, 18.0f, theme::kTextDim);
-    Text(footer, r.x + 24.0f, r.y + r.height - 34.0f, 18.0f, hover ? theme::kAccent : theme::kText);
+    const float a = HoverAnim(r);
+    Angled(r, Lerp2(theme::kPanel, theme::kPanel2, a), 16.0f);
+    // Accent edge grows on hover.
+    Fill(Rectangle{r.x, r.y, 5.0f + 3.0f * a, r.height - 16.0f}, Lerp2(theme::kAccentDim, theme::kAccent, a));
+    Text(TextFormat("%02d", index), r.x + r.width - 24.0f, r.y + 16.0f, 20.0f, Alpha(theme::kTextDim, 0.5f), Align::Right);
+    TextBold(title, r.x + 26.0f, r.y + 16.0f, 30.0f, theme::kText);
+    TextBlock(desc, r.x + 26.0f, r.y + 58.0f, r.width - 150.0f, 18.0f, theme::kTextDim);
+    Text(footer, r.x + 26.0f + 6.0f * a, r.y + r.height - 34.0f, 18.0f, Lerp2(theme::kText, theme::kAccent, a));
+    DrawModeIcon(mode, r.x + r.width - 68.0f, r.y + r.height * 0.55f, 70.0f, Lerp2(theme::kTextDim, theme::kText, a));
     return hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
@@ -118,9 +184,11 @@ void App::ScreenFirstRun() {
 
 void App::ScreenMainMenu() {
     const float x0 = ContentX();
-    Title("RAWAIM", x0, 60.0f, 64.0f);
-    Text("Aim trainer calibrated for Valorant  |  raw input  |  0.07 deg/count  |  103 HFOV", x0 + 6.0f, 140.0f, 20.0f,
+    Logo(x0, 52.0f, 104.0f);
+    TextBold("VALTRAINER", x0 + 126.0f, 58.0f, 64.0f, theme::kText);
+    Text("Aim trainer calibrated for Valorant  |  raw input  |  0.07 deg/count  |  103 HFOV", x0 + 130.0f, 132.0f, 20.0f,
          theme::kTextDim);
+    Text(TextFormat("v%s", kAppVersion), x0 + kContentWidth, VH() - 40.0f, 18.0f, Alpha(theme::kTextDim, 0.7f), Align::Right);
 
     // Mode cards: 2 columns x 3 rows.
     const float cw = 470.0f, ch = 170.0f, gap = 18.0f;
@@ -130,7 +198,7 @@ void App::ScreenMainMenu() {
         const float cy = 200.0f + static_cast<float>(i / 2) * (ch + gap);
         long long best = 0;
         const std::string footer = stats_.BestScore(m, best) ? "BEST " + std::to_string(best) + "   >  PLAY" : ">  PLAY";
-        if (Card(Rectangle{cx, cy, cw, ch}, ModeName(m), ModeDescription(m), footer, i + 1)) {
+        if (Card(Rectangle{cx, cy, cw, ch}, m, ModeName(m), ModeDescription(m), footer, i + 1)) {
             StartRun(m, false);
             return;
         }
@@ -201,7 +269,16 @@ void App::ScreenResults() {
         StatTile(Rectangle{x0 + static_cast<float>(col) * (tw + 10.0f), 200.0f + static_cast<float>(row) * (th + 12.0f), tw, th},
                  title, value, c);
     };
-    tile(0, 0, "SCORE", std::to_string(s.score), theme::kAccent);
+    // Score counts up over 0.7 s (ease-out).
+    const double k = std::min(1.0, (platform::Now() - resultsShownAt_) / 0.7);
+    const double eased = 1.0 - (1.0 - k) * (1.0 - k) * (1.0 - k);
+    const long long shown = static_cast<long long>(std::llround(static_cast<double>(s.score) * eased));
+    std::string scoreTitle = "SCORE";
+    if (hadPreviousBest_ && previousBest_ > 0) {
+        const double vsPb = (static_cast<double>(s.score) / static_cast<double>(previousBest_) - 1.0) * 100.0;
+        scoreTitle = TextFormat("SCORE  (%+.0f%% vs PB)", vsPb);
+    }
+    tile(0, 0, scoreTitle, std::to_string(shown), theme::kAccent);
     tile(1, 0, s.mode == ModeId::Tracking ? "ACCURACY (ON TARGET WHILE FIRING)" : "ACCURACY", Fmt(s.Accuracy() * 100.0, 1) + "%",
          theme::kAccent);
     if (s.mode == ModeId::Tracking) {

@@ -72,7 +72,7 @@ void DrawTarget(const World& world, const Target& t, Color base) {
         return;
     }
     const Color body = Shade(c, 0.85f);
-    world.DrawBoxLit(LegCenter(t), Vector3{hitbox::kLegWidth, hitbox::kLegHeight, hitbox::kLegDepth}, Shade(c, 0.7f));
-    world.DrawBoxLit(TorsoCenter(t), Vector3{hitbox::kTorsoWidth, hitbox::kTorsoHeight, hitbox::kTorsoDepth}, body);
+    world.DrawBoxLit(LegCenter(t), Vector3{hitbox::kLegWidth, hitbox::kLegHeight, hitbox::kLegDepth}, Shade(c, 0.7f), Surface::Target);
+    world.DrawBoxLit(TorsoCenter(t), Vector3{hitbox::kTorsoWidth, hitbox::kTorsoHeight, hitbox::kTorsoDepth}, body, Surface::Target);
     world.DrawSphereLit(HeadCenter(t), hitbox::kHeadRadius, c);
 }

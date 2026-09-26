@@ -51,6 +51,14 @@ void Angled(Rectangle r, Color c, float cut);
 void Line(Vector2 a, Vector2 b, float thickness, Color c);
 void Tri(Vector2 a, Vector2 b, Vector2 c, Color col);
 void Title(const std::string& s, float x, float y, float size);  // title with red slash
+// Heavier text (drawn twice with a small offset) for headings and numbers.
+void TextBold(const std::string& s, float x, float y, float size, Color c, Align a = Align::Left);
+void Circle(Vector2 center, float radius, Color c);
+void CircleLines(Vector2 center, float radius, float thickness, Color c);
+// The Valtrainer emblem (same design as the app icon), 'size' units square.
+void Logo(float x, float y, float size);
+// Smoothly animated 0..1 hover amount for a rectangle (for highlights).
+float HoverAnim(Rectangle r, bool enabled = true);
 void Backdrop();  // full screen background with accent stripes
 Color Alpha(Color c, float alpha);
 
