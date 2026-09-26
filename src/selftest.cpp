@@ -164,18 +164,21 @@ bool RunSelfTest(std::string& report) {
         RunRecord g;
         g.mode = ModeId::Gridshot;
         g.duration = 60.0;
-        g.hits = 126;  // 2.1 kills/s at 100% = exactly Gold's start
+        g.hits = 180;  // 3.0 kills/s at 100% = exactly Gold's start
         g.accuracy = 100.0;
         AimRank r;
-        c.True("rank: gridshot 2.1 kills/s = Gold 1", RankFromRecord(g, r) && RankLabel(r) == "Gold 1");
-        g.accuracy = 25.0;  // same kills, sqrt(0.25) = half the value
-        c.True("rank: accuracy matters (25% acc drops to Iron/Bronze)", RankFromRecord(g, r) && r.tier <= 1);
+        c.True("rank: gridshot 3.0 kills/s = Gold 1", RankFromRecord(g, r) && RankLabel(r) == "Gold 1");
+        g.accuracy = 50.0;  // same kills at half the accuracy = half the value
+        c.True("rank: accuracy matters (50% acc drops to Iron)", RankFromRecord(g, r) && r.tier == 0);
+        g.hits = 176;  // the reported run: 176 hits, 91.2% -> 2.68 = Silver 2
+        g.accuracy = 91.2;
+        c.True("rank: 176 hits @ 91% in 60 s = Silver 2", RankFromRecord(g, r) && RankLabel(r) == "Silver 2");
         RunRecord rx;
         rx.mode = ModeId::Reaction;
         rx.duration = 60.0;
         rx.hits = 20;
-        rx.avgReactionMs = 275.0;
-        c.True("rank: reaction 275 ms = Gold 1", RankFromRecord(rx, r) && RankLabel(r) == "Gold 1");
+        rx.avgReactionMs = 258.0;
+        c.True("rank: reaction 258 ms = Gold 1", RankFromRecord(rx, r) && RankLabel(r) == "Gold 1");
         rx.avgReactionMs = 190.0;
         c.True("rank: reaction 190 ms = Radiant", RankFromRecord(rx, r) && RankLabel(r) == "Radiant");
         rx.avgReactionMs = 420.0;

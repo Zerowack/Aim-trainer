@@ -6,7 +6,7 @@
 //
 // How it works:
 //   * Each mode turns one run into a "skill value" (e.g. kills per second
-//     weighted by accuracy, time-on-target %, reaction ms).
+//     multiplied by accuracy, time-on-target %, reaction ms).
 //   * The value is placed between per-mode tier thresholds, giving a
 //     continuous "rank points" number: 0 = Iron 1, 3 = Bronze 1, ...,
 //     21 = Immortal 1, 24 = Radiant.

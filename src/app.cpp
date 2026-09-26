@@ -115,6 +115,9 @@ void App::ApplyDisplayMode() {
             break;
         case DisplayMode::Borderless:
             ToggleBorderlessWindowed();
+            // raylib makes borderless windows "always on top", which stops
+            // Alt-Tab / the Windows key from showing other programs.
+            ClearWindowState(FLAG_WINDOW_TOPMOST);
             break;
         case DisplayMode::Windowed: {
             const int w = std::min(cfg_.windowWidth, mw - 80);
@@ -199,6 +202,14 @@ void App::Frame() {
 
     // 4) Game logic.
     if (screen_ == Screen::Playing) UpdatePlaying(events, now);
+
+    // While minimized: draw nothing (the window has no size), just idle.
+    if (IsWindowMinimized()) {
+        BeginDrawing();
+        EndDrawing();
+        platform::PreciseWaitUntil(platform::Now() + 1.0 / 30.0);
+        return;
+    }
 
     // 5) Render (+ immediate-mode UI for menus).
     BeginDrawing();
@@ -542,7 +553,7 @@ void App::DrawPauseMenu() {
     using namespace ui;
     const float vw = VW(), vh = VH();
     Fill(Rectangle{0.0f, 0.0f, vw, vh}, Alpha(theme::kBg, 0.78f));
-    const Rectangle panel = {vw * 0.5f - 260.0f, vh * 0.5f - 250.0f, 520.0f, 500.0f};
+    const Rectangle panel = {vw * 0.5f - 260.0f, vh * 0.5f - 290.0f, 520.0f, 580.0f};
     Angled(panel, theme::kPanel, 22.0f);
     Title("PAUSED", panel.x + 40.0f, panel.y + 36.0f, 44.0f);
 
@@ -561,6 +572,11 @@ void App::DrawPauseMenu() {
     y += 76.0f;
     if (Button(Rectangle{bx, y, bw, 58.0f}, "SETTINGS")) {
         OpenSettings(Screen::Playing);
+        return;
+    }
+    y += 76.0f;
+    if (Button(Rectangle{bx, y, bw, 58.0f}, "MINIMIZE")) {
+        MinimizeWindow();  // the run stays paused
         return;
     }
     y += 76.0f;

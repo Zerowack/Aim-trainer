@@ -172,7 +172,9 @@ Valtrainer shows your eDPI (`DPI × sens`) and cm/360
 | Restart run | R |
 | FPS counter on/off | F2 |
 
-Alt-tab or any focus loss pauses the run and releases the cursor immediately.
+Alt-tab or any focus loss pauses the run and releases the cursor immediately. To minimize in any display
+mode, use **MINIMIZE** on the main menu or in the pause menu, or press Alt-Tab or the Windows key
+(Borderless mode doesn't stay on top of other programs).
 
 **Modes** (60 s by default, adjustable in Settings → Gameplay, with a 3 s countdown):
 
@@ -190,7 +192,7 @@ Alt-tab or any focus loss pauses the run and releases the cursor immediately.
 over/undershoot, average click error and coaching tips.
 
 **Aim rank (estimate):** every ranked run (20 s or longer) gets a Valorant-style tier from
-Iron 1 to Radiant, based on that mode's core stat weighted by accuracy:
+Iron 1 to Radiant, based on that mode's core stat multiplied by accuracy:
 kills per second for Gridshot, Microshot, Flick 180 and Peek, time on target for Tracking,
 and average ms for Reaction. A mode's rank is the median of its last 5 runs. Your overall
 rank on the main menu averages all modes you've played (at least 3 are needed). This

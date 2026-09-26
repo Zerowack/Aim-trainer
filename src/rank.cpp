@@ -17,18 +17,18 @@ struct Thresholds {
 
 bool ThresholdsFor(ModeId m, Thresholds& t) {
     switch (m) {
-        // Gridshot: kills per second x sqrt(accuracy).
-        case ModeId::Gridshot: t = {{0.9, 1.3, 1.7, 2.1, 2.5, 2.9, 3.3, 3.8, 4.4}, false}; return true;
-        // Microshot: head-size kills per second x sqrt(accuracy).
-        case ModeId::Microshot: t = {{0.30, 0.45, 0.60, 0.75, 0.90, 1.05, 1.20, 1.40, 1.65}, false}; return true;
+        // Gridshot: kills per second x accuracy.
+        case ModeId::Gridshot: t = {{1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.8}, false}; return true;
+        // Microshot: head-size kills per second x accuracy.
+        case ModeId::Microshot: t = {{0.45, 0.65, 0.85, 1.05, 1.25, 1.45, 1.65, 1.85, 2.10}, false}; return true;
         // Tracking: time on target, percent.
-        case ModeId::Tracking: t = {{20.0, 27.0, 34.0, 41.0, 48.0, 55.0, 62.0, 69.0, 77.0}, false}; return true;
-        // Flick 180: kills per second x sqrt(accuracy).
-        case ModeId::Flick180: t = {{0.25, 0.36, 0.48, 0.60, 0.72, 0.84, 0.96, 1.10, 1.26}, false}; return true;
+        case ModeId::Tracking: t = {{30.0, 38.0, 46.0, 54.0, 61.0, 68.0, 75.0, 82.0, 89.0}, false}; return true;
+        // Flick 180: kills per second x accuracy.
+        case ModeId::Flick180: t = {{0.35, 0.50, 0.65, 0.80, 0.95, 1.10, 1.25, 1.40, 1.60}, false}; return true;
         // Reaction: average ms (includes your monitor/system latency).
-        case ModeId::Reaction: t = {{340.0, 315.0, 295.0, 275.0, 258.0, 243.0, 229.0, 215.0, 200.0}, true}; return true;
-        // Peek: peeks killed per second x sqrt(accuracy).
-        case ModeId::Peek: t = {{0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50}, false}; return true;
+        case ModeId::Reaction: t = {{320.0, 295.0, 275.0, 258.0, 243.0, 230.0, 218.0, 207.0, 195.0}, true}; return true;
+        // Peek: peeks killed per second x accuracy (the peek rate caps this near 0.58).
+        case ModeId::Peek: t = {{0.14, 0.20, 0.26, 0.32, 0.37, 0.42, 0.46, 0.50, 0.54}, false}; return true;
         default: return false;
     }
 }
@@ -74,63 +74,81 @@ std::string RankLabel(const AimRank& r) {
 
 const char* RankRoast(const AimRank& r, unsigned int seed) {
     static const char* const iron[] = {
-        "Your aim is dogshit. The targets are literally standing still, bro.",
         "Just delete the game, it's not for u lil bro.",
+        "Your aim is dogshit. The targets are literally standing still, bro.",
         "Were you aiming with your monitor turned off?",
-        "Even the practice bots feel bad for you.",
         "Uninstall. Go outside. Find a new hobby. Maybe knitting.",
+        "The bots filed a restraining order because you keep missing them.",
+        "Your mouse is begging to be unplugged.",
+        "A Roomba with a crosshair would out-frag you.",
     };
     static const char* const bronze[] = {
-        "Bronze aim. You shoot like the mouse is upside down.",
-        "Your crosshair has serious commitment issues.",
-        "Hardstuck energy detected. Keep grinding, lil bro.",
-        "You miss more than a stormtrooper at a family reunion.",
+        "Bronze. You shoot like the mouse is upside down and on fire.",
+        "Your crosshair has commitment issues and zero game sense.",
+        "Hardstuck and it shows. Every single shot shows.",
+        "You miss more than a stormtrooper with his eyes closed.",
+        "Your aim is so bad the enemy team feels guilty killing you.",
+        "Bronze aim, Radiant excuses.",
     };
     static const char* const silver[] = {
         "Silver: you hit shots... occasionally... mostly by accident.",
-        "Not bad. Not good. Just... there.",
-        "Aim of a Jett main who forgot she can dash.",
-        "The enemy team isn't scared, but they're not laughing either.",
+        "Your aim is trash with extra steps.",
+        "You're the reason your team types 'ff 15'.",
+        "Aim of a Jett main who forgot she has a dash and a brain.",
+        "Mid is a compliment you haven't earned yet.",
+        "Your flicks have the confidence of a first date.",
     };
     static const char* const gold[] = {
-        "Gold. Perfectly average. The human definition of 'mid'.",
-        "Your aim won't lose you games. It won't win them either.",
-        "Solid. Now stop crouch-spraying across the map.",
+        "Gold. Perfectly average. Nobody will ever remember a single shot you hit.",
+        "Your aim won't lose you games. Your team still carries you anyway.",
+        "Gold aim: good enough to peek, not good enough to win the duel.",
+        "You're the human definition of 'mid'. Congrats, I guess.",
+        "Stop crouch-spraying across the map. It's embarrassing.",
     };
     static const char* const plat[] = {
-        "Platinum hands. Now fix that crosshair placement.",
-        "Decent. Your teammates might finally stop typing 'diff'.",
-        "You're getting dangerous. Mildly dangerous.",
+        "Platinum. Now stop whiffing the first bullet like it owes you money.",
+        "Decent hands, room-temperature crosshair placement.",
+        "Your teammates still type 'diff'. They mean you.",
+        "Plat aim is a participation trophy with extra steps.",
+        "You're dangerous... to your own team's KDA.",
     };
     static const char* const diamond[] = {
-        "Diamond aim. Clean. The enemy is checking your tracker.",
-        "Crisp flicks. Your mouse pad fears you.",
-        "Okay, you're actually good. Don't let it go to your head.",
+        "Diamond. Clean, but Ascendants eat you for breakfast.",
+        "Nice flicks. Shame about the brain attached to them.",
+        "Good aim, hardstuck anyway. Must be the rest of you.",
+        "Diamond hands, Iron decision making.",
+        "You're good. Not 'stop playing aim trainers' good. Keep clicking.",
     };
     static const char* const ascendant[] = {
-        "Ascendant aim. Stop playing aim trainers and go rank up.",
-        "Cracked. Someone is typing 'reported' in all chat right now.",
-        "Your aim is doing all the carrying. Hope your brain catches up.",
+        "Ascendant aim. So why are you still hardstuck, champ?",
+        "Cracked mechanics, washed game sense.",
+        "Someone is typing 'reported' in all chat. They're not wrong.",
+        "Your aim carries. Your utility usage does not.",
+        "Almost Immortal. Almost. Like always.",
     };
     static const char* const immortal[] = {
-        "Immortal aim. Reported for aimbot, probably.",
-        "Your mouse deserves a raise and paid holidays.",
-        "Heads are just magnets for your crosshair at this point.",
+        "Immortal aim. Touch grass, the sun misses you.",
+        "Reported for aimbot. Twice. By your own team.",
+        "Your mouse deserves a raise, you deserve a shower.",
+        "Heads are magnets for your crosshair. Now get a life.",
+        "One step from Radiant and a thousand steps from a social life.",
     };
     static const char* const radiant[] = {
-        "Radiant aim. Are you a pro or is your crosshair glued to heads?",
-        "Touch grass. Please. You've peaked.",
-        "Absolutely inhuman. Go sign a contract.",
+        "Radiant. Either you're a pro or your crosshair is glued to heads. Log off.",
+        "Touch grass. Please. You've peaked, there's nothing left here.",
+        "Absolutely inhuman. The anticheat wants a word.",
+        "Go sign a contract or go outside. Pick one.",
+        "Your aim is perfect. Your sleep schedule is not.",
     };
     struct List {
         const char* const* lines;
         unsigned int count;
     };
-    static const List lists[kTierCount] = {{iron, 5}, {bronze, 4}, {silver, 4}, {gold, 3}, {plat, 3},
-                                           {diamond, 3}, {ascendant, 3}, {immortal, 3}, {radiant, 3}};
+    static const List lists[kTierCount] = {{iron, 7}, {bronze, 6}, {silver, 6}, {gold, 5}, {plat, 5},
+                                           {diamond, 5}, {ascendant, 5}, {immortal, 5}, {radiant, 5}};
     const List& l = lists[std::max(0, std::min(kTierCount - 1, r.tier))];
-    // Iron 1 always gets the classic.
-    if (r.tier == 0 && r.division == 1 && (seed % 2u) == 0u) return iron[1];
+    // Iron 1 gets the classic most of the time.
+    if (r.tier == 0 && r.division == 1 && (seed % 3u) != 0u) return iron[0];
     return l.lines[seed % l.count];
 }
 
@@ -183,7 +201,7 @@ bool RankFromRecord(const RunRecord& rec, AimRank& out) {
             break;
         default:
             if (rec.hits < 5) return false;
-            value = static_cast<double>(rec.hits) / rec.duration * std::sqrt(acc);
+            value = static_cast<double>(rec.hits) / rec.duration * acc;
             break;
     }
     out = RankFromPoints(PointsFromValue(value, t));

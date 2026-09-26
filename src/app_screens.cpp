@@ -246,7 +246,13 @@ void App::ScreenMainMenu() {
         return;
     }
     by += 80.0f;
-    if (Button(Rectangle{rx, by, rw, 64.0f}, "QUIT")) {
+    // Minimize (works in every display mode) and quit, side by side.
+    const float half = (rw - 12.0f) * 0.5f;
+    if (Button(Rectangle{rx, by, half, 64.0f}, "MINIMIZE")) {
+        MinimizeWindow();
+        return;
+    }
+    if (Button(Rectangle{rx + half + 12.0f, by, half, 64.0f}, "QUIT")) {
         quit_ = true;
         return;
     }
