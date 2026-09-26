@@ -17,7 +17,7 @@
 #include "stats.h"
 #include "world.h"
 
-constexpr const char* kAppVersion = "1.7.0";
+constexpr const char* kAppVersion = "1.7.1";
 
 // Game clock = real time minus all time spent paused.
 struct GameClock {
@@ -194,6 +194,4 @@ private:
     std::string selfTestReport_;
     bool rawInputOk_ = true;
     bool quit_ = false;
-    Screen lastScreen_ = Screen::MainMenu;
-    double screenChangedAt_ = -1.0;  // for the fade between screens
 };

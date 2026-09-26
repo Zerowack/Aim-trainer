@@ -233,16 +233,6 @@ void App::Frame() {
     }
     if (screen_ != Screen::Playing) DrawFpsCounter();
 
-    // Quick fade whenever the screen changes.
-    if (screen_ != lastScreen_) {
-        lastScreen_ = screen_;
-        screenChangedAt_ = platform::Now();
-    }
-    const double sinceChange = platform::Now() - screenChangedAt_;
-    if (screenChangedAt_ >= 0.0 && sinceChange < 0.18) {
-        const float a = static_cast<float>(1.0 - sinceChange / 0.18);
-        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), ui::Alpha(ui::theme::kBg, 0.7f * a * a));
-    }
     EndDrawing();
 
     // 6) Targets drawn for the first time become "visible" now, after the

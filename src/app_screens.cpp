@@ -487,47 +487,54 @@ void App::ScreenSettings() {
 }
 
 void App::SettingsSensitivity(float x, float y, float w) {
-    Text("MOUSE DPI", x, y, 20.0f, theme::kTextDim);
+    // Row 1: the three inputs, side by side.
+    const float col = (w - 40.0f) / 3.0f;
     double v = 0.0;
-    if (TextBox(Rectangle{x, y + 28.0f, 360.0f, 54.0f}, 10, &dpiText_, 6, true) && ParseNumber(dpiText_, 50.0, 32000.0, v)) {
+    Text("MOUSE DPI", x, y, 20.0f, theme::kTextDim);
+    if (TextBox(Rectangle{x, y + 28.0f, col, 54.0f}, 10, &dpiText_, 6, true) && ParseNumber(dpiText_, 50.0, 32000.0, v)) {
         cfg_.dpi = v;
     }
-    Text("VALORANT SENSITIVITY", x + 400.0f, y, 20.0f, theme::kTextDim);
-    if (TextBox(Rectangle{x + 400.0f, y + 28.0f, 360.0f, 54.0f}, 11, &sensText_, 8, true) &&
+    Text("VALORANT SENSITIVITY", x + col + 20.0f, y, 20.0f, theme::kTextDim);
+    if (TextBox(Rectangle{x + col + 20.0f, y + 28.0f, col, 54.0f}, 11, &sensText_, 8, true) &&
         ParseNumber(sensText_, 0.001, 20.0, v)) {
         cfg_.sens = v;
     }
-    DrawSensSummary(x, y + 120.0f, w, cfg_.dpi, cfg_.sens);
-
-    TextBlock("How it works: Valorant turns 0.07 degrees per mouse count at sensitivity 1.0, so each count turns "
-              "sens x 0.07 degrees. cm/360 = 360 / (DPI x sens x 0.07) x 2.54. The trainer reads Raw Input, so Windows "
-              "pointer speed and 'Enhance pointer precision' have no effect - exactly like in Valorant. There is no "
-              "smoothing or acceleration of any kind.",
-              x, y + 260.0f, w * 0.75f, 20.0f, theme::kTextDim);
-    TextBlock(TextFormat("One count at your sens = %.4f degrees. A full 360 needs %.0f counts.", val::DegreesPerCount(cfg_.sens),
-                         360.0 / val::DegreesPerCount(cfg_.sens)),
-              x, y + 390.0f, w * 0.75f, 20.0f, theme::kText);
-
-    // Scoped sensitivity (Valorant: Settings > General > Mouse > Scoped Sensitivity Multiplier).
-    Text("SCOPED SENSITIVITY MULTIPLIER", x + 800.0f, y, 20.0f, theme::kTextDim);
-    if (TextBox(Rectangle{x + 800.0f, y + 28.0f, 240.0f, 54.0f}, 13, &scopedMultText_, 6, true) &&
+    // Valorant: Settings > General > Mouse > Scoped Sensitivity Multiplier.
+    Text("SCOPED SENS MULTIPLIER (VALORANT DEFAULT 1.0)", x + 2.0f * (col + 20.0f), y, 20.0f, theme::kTextDim);
+    if (TextBox(Rectangle{x + 2.0f * (col + 20.0f), y + 28.0f, col, 54.0f}, 13, &scopedMultText_, 6, true) &&
         ParseNumber(scopedMultText_, 0.01, 10.0, v)) {
         cfg_.scopedMult = v;
     }
-    Text("Same as Valorant (default 1.0)", x + 1060.0f, y + 44.0f, 18.0f, theme::kTextDim);
+
+    // Row 2: hipfire summary.
+    DrawSensSummary(x, y + 110.0f, w, cfg_.dpi, cfg_.sens);
+
+    // Row 3: effective scoped sens per zoom level.
+    const float tw = (w - 20.0f) / 3.0f;
+    static const double zooms[3] = {2.5, 3.5, 5.0};
+    static const char* const what[3] = {"OPERATOR 1ST ZOOM  2.5x", "MARSHAL / OUTLAW  3.5x", "OPERATOR 2ND ZOOM  5.0x"};
     for (int i = 0; i < 3; ++i) {
-        static const double zooms[3] = {2.5, 3.5, 5.0};
-        static const char* const what[3] = {"Operator 1st zoom", "Marshal / Outlaw", "Operator 2nd zoom"};
         const double eff = val::ScopedSens(cfg_.sens, cfg_.scopedMult, zooms[i]);
-        Text(TextFormat("%s  %.1fx:  eff. sens %.4f  |  %.1f cm/360", what[i], zooms[i], eff, val::Cm360(cfg_.dpi, eff)),
-             x + 800.0f, y + 100.0f + static_cast<float>(i) * 26.0f, 17.0f, theme::kText);
+        StatTile(Rectangle{x + static_cast<float>(i) * (tw + 10.0f), y + 222.0f, tw, 96.0f}, what[i],
+                 TextFormat("%.4f   %.1f cm/360", eff, val::Cm360(cfg_.dpi, eff)), theme::kAccentDim);
     }
-    Toggle(Rectangle{x, y + 450.0f, std::min(760.0f, w), 50.0f}, "Auto-adjust sens from coach", &cfg_.autoSens);
+
+    // Explanations.
+    TextBlock("How it works: Valorant turns 0.07 degrees per mouse count at sensitivity 1.0, so each count turns "
+              "sens x 0.07 degrees (scoped: x multiplier / zoom). cm/360 = 360 / (DPI x sens x 0.07) x 2.54. The trainer "
+              "reads Raw Input, so Windows pointer speed and 'Enhance pointer precision' have no effect - exactly like in "
+              "Valorant. There is no smoothing or acceleration of any kind.",
+              x, y + 346.0f, w, 19.0f, theme::kTextDim);
+    Text(TextFormat("One count at your sens = %.4f degrees. A full 360 needs %.0f counts.", val::DegreesPerCount(cfg_.sens),
+                    360.0 / val::DegreesPerCount(cfg_.sens)),
+         x, y + 438.0f, 19.0f, theme::kText);
+
+    Toggle(Rectangle{x, y + 474.0f, std::min(760.0f, w), 50.0f}, "Auto-adjust sens from coach", &cfg_.autoSens);
     TextBlock("When on, the coach's over/undershoot suggestion (for example \"you overshoot, lower sens ~5%\") is "
               "applied to your sens automatically after each run, 2-15% at a time. It only changes when a run has enough "
               "flick data (6+ directional misses) and a clear tendency. The results screen shows the change and has "
               "an UNDO button. Remember to copy the new value into Valorant.",
-              x, y + 510.0f, w * 0.75f, 20.0f, theme::kTextDim);
+              x, y + 530.0f, w, 19.0f, theme::kTextDim);
 }
 
 void App::SettingsVideo(float x, float y, float w) {
