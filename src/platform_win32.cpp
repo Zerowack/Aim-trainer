@@ -146,6 +146,10 @@ void OnFocusLost() {
 LRESULT CALLBACK SubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_INPUT:
+            // Raw input only arrives while this window is in the foreground,
+            // so it also proves we have focus again (some overlays / screenshot
+            // tools give focus back without the usual activation messages).
+            g_focused = true;
             HandleRawInput(lParam);
             break;  // Forward so DefWindowProc can clean up the input buffer.
         case WM_ACTIVATEAPP:
@@ -269,7 +273,7 @@ bool IsCursorLocked() { return g_cursorLocked; }
 
 void UpdateCursorLock() {
     if (!g_hwnd) return;
-    if (!g_cursorLocked || !g_focused || IsIconic(g_hwnd)) return;
+    if (!g_cursorLocked || !HasFocus()) return;
 
     RECT client;
     GetClientRect(g_hwnd, &client);
@@ -289,7 +293,27 @@ void UpdateCursorLock() {
     }
 }
 
-bool HasFocus() { return g_focused; }
+bool HasFocus() {
+    // Ask Windows directly instead of trusting only the focus messages.
+    if (!g_hwnd) return g_focused;
+    if (IsIconic(g_hwnd)) return false;
+    const bool fg = GetForegroundWindow() == g_hwnd;
+    if (fg) g_focused = true;
+    return fg;
+}
+
+void AllowMinimize() {
+    if (!g_hwnd) return;
+    // Borderless / fullscreen windows are created without a minimize box, so
+    // clicking the taskbar button or Win+Down did nothing. Add it (it isn't
+    // drawn on a window without a title bar).
+    const LONG_PTR style = GetWindowLongPtrW(g_hwnd, GWL_STYLE);
+    const LONG_PTR want = style | WS_MINIMIZEBOX | WS_SYSMENU;
+    if (want != style) {
+        SetWindowLongPtrW(g_hwnd, GWL_STYLE, want);
+        SetWindowPos(g_hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
+}
 
 bool ConsumeFocusLost() {
     const bool v = g_focusLostPending;

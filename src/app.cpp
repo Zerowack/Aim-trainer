@@ -128,6 +128,7 @@ void App::ApplyDisplayMode() {
             break;
         }
     }
+    platform::AllowMinimize();
     platform::SetVSync(false);  // some drivers re-enable it after a mode change
     nextFrameDeadline_ = 0.0;
 }
@@ -248,6 +249,10 @@ void App::Frame() {
         const int menuCap = std::max(kMenuFpsLimit, GetMonitorRefreshRate(GetCurrentMonitor()) + 10);
         if (cap == 0 || cap > menuCap) cap = menuCap;
     }
+    // Paused or in the background (Alt-Tab, screenshot tools): no need for
+    // hundreds of FPS, and it keeps other programs smooth.
+    if (screen_ == Screen::Playing && paused_ && (cap == 0 || cap > 240)) cap = 240;
+    if (!platform::HasFocus() && (cap == 0 || cap > 60)) cap = 60;
     if (IsWindowMinimized()) cap = 30;
     if (cap > 0) {
         const double period = 1.0 / cap;

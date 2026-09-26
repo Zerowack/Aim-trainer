@@ -62,6 +62,8 @@ void UpdateCursorLock();
 // Focus tracking. ConsumeFocusLost() returns true once after each focus loss.
 bool HasFocus();
 bool ConsumeFocusLost();
+// Lets the taskbar button / Win+Down minimize the window in every display mode.
+void AllowMinimize();
 bool QuitRequested();
 
 // Forces the OpenGL swap interval (0 = vsync off) via wglSwapIntervalEXT.

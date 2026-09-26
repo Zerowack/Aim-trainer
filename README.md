@@ -179,9 +179,10 @@ Valtrainer shows your eDPI (`DPI × sens`) and cm/360
 | Restart run (in VS Bot, R reloads) | R |
 | FPS counter on/off | F2 |
 
-Alt-tab or any focus loss pauses the run and releases the cursor immediately. To minimize in any display
-mode, use **MINIMIZE** on the main menu or in the pause menu, or press Alt-Tab or the Windows key
-(Borderless mode doesn't stay on top of other programs).
+Alt-tab or any focus loss (including screenshot tools) pauses the run and releases the cursor
+immediately. While paused or in the background the app drops to 60 FPS so other programs stay smooth.
+To minimize in any display mode, click Valtrainer's taskbar button, press Win+Down, or use
+**MINIMIZE** on the main menu or in the pause menu.
 
 **Modes** (60 s by default, adjustable in Settings → Gameplay, with a 3 s countdown):
 

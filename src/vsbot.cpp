@@ -210,8 +210,10 @@ public:
             w.DrawBoxLit(Vector3{0.0f, 0.004f, z + 3.1f}, Vector3{14.0f, 0.006f, 0.12f}, k, Surface::Plain);
             w.DrawBoxLit(Vector3{-7.0f, 0.004f, z}, Vector3{0.12f, 0.006f, 6.2f}, k, Surface::Plain);
             w.DrawBoxLit(Vector3{7.0f, 0.004f, z}, Vector3{0.12f, 0.006f, 6.2f}, k, Surface::Plain);
-            w.DrawBoxLit(Vector3{0.0f, 0.003f, z}, Vector3{14.0f, 0.004f, 6.2f}, Shade(Color{c.r, c.g, c.b, 255}, 0.55f * ctx_.brightness),
-                         Surface::Floor);
+            // Floor inside the zone: the normal floor with a light tint.
+            const Color tint = {static_cast<unsigned char>((92 * 3 + c.r) / 4), static_cast<unsigned char>((94 * 3 + c.g) / 4),
+                                static_cast<unsigned char>((100 * 3 + c.b) / 4), 255};
+            w.DrawBoxLit(Vector3{0.0f, 0.003f, z}, Vector3{14.0f, 0.004f, 6.2f}, Shade(tint, ctx_.brightness), Surface::Floor);
         };
         zone(17.6f, Color{70, 130, 220, 255});
         zone(-17.6f, Color{220, 70, 80, 255});
