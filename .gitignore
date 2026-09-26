@@ -1,0 +1,11 @@
+# Build output
+build/
+out/
+.vs/
+CMakeUserPresets.json
+
+# Files the app writes next to the .exe when run from the source folder
+config.ini
+stats.csv
+finder_sessions.csv
+finder_tests.csv
