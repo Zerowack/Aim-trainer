@@ -26,6 +26,17 @@ No Riot logos, fonts or assets are used. The UI uses the Windows system font
 
 ---
 
+## Just want to play? Download it
+
+Open the repository's **Releases** page (right-hand side on GitHub), download
+**`RawAim-windows-x64.zip`**, extract it and double-click `RawAim.exe`. No
+install is needed. Every release is built automatically by GitHub Actions with
+Visual Studio (MSVC), with warnings treated as errors and the math self-test run.
+
+To build it yourself instead, follow the steps below.
+
+---
+
 ## Build it (step by step)
 
 You only need two free tools: **Visual Studio 2022 Build Tools** (the C++
@@ -123,6 +134,9 @@ Debug builds run a self-test at startup that checks the sensitivity, cm/360,
 FOV, camera, PSA and crosshair-code math against known answers. The result is shown at
 the bottom of the main menu ("math self-test PASSED"). If anything fails, a
 message box lists the failing checks.
+
+You can also run `build\Debug\RawAimSelfTest.exe` (or the Release one) in the
+terminal. It prints every check without opening a window.
 
 ### Troubleshooting
 

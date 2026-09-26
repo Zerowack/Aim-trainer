@@ -1,0 +1,57 @@
+# Builds RawAim with MSVC on Windows for every push.
+# Pushing a tag like v1.0.0 also publishes a GitHub Release with the .zip.
+name: Build and release
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (MSVC, warnings are errors)
+        run: cmake -S . -B build -A x64 -DRAWAIM_WARNINGS_AS_ERRORS=ON
+
+      - name: Build Release
+        run: cmake --build build --config Release
+
+      - name: Run math self-test (Release)
+        run: build/Release/RawAimSelfTest.exe
+
+      - name: Build Debug (runs the self-test at startup)
+        run: cmake --build build --config Debug
+
+      - name: Run math self-test (Debug)
+        run: build/Debug/RawAimSelfTest.exe
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build/Release/RawAim.exe dist/
+          Copy-Item README.md dist/
+          Compress-Archive -Path dist/* -DestinationPath RawAim-windows-x64.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RawAim-windows-x64
+          path: RawAim-windows-x64.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: RawAim-windows-x64.zip
+          generate_release_notes: true
+          body: |
+            **Download `RawAim-windows-x64.zip`**, extract it, and run `RawAim.exe` (Windows 10/11, 64-bit).
+            No install needed. Settings and stats are saved next to the .exe.
+            Windows SmartScreen may warn because the exe is unsigned: click *More info → Run anyway*.

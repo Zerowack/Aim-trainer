@@ -16,6 +16,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(RAWAIM_WARNINGS_AS_ERRORS "Fail the build on any compiler warning (used by CI)" OFF)
+
 # Single-config generators (Ninja, MinGW Makefiles) default to Release.
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
@@ -85,16 +87,40 @@ add_executable(RawAim WIN32
     src/world.h
 )
 
-target_link_libraries(RawAim PRIVATE raylib opengl32 winmm user32 gdi32)
-target_compile_definitions(RawAim PRIVATE _CRT_SECURE_NO_WARNINGS UNICODE _UNICODE)
+# Warning flags shared by the app and the self-test tool.
+function(rawaim_setup target)
+    target_link_libraries(${target} PRIVATE raylib opengl32 winmm user32 gdi32)
+    target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS UNICODE _UNICODE)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8 /MP)
+        if(RAWAIM_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE /WX)
+        endif()
+    else()
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Wshadow -Wconversion)
+        target_link_options(${target} PRIVATE -static -static-libgcc -static-libstdc++)
+        if(RAWAIM_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE -Werror)
+        endif()
+    endif()
+endfunction()
 
+rawaim_setup(RawAim)
 if(MSVC)
-    # /W4 = high warning level. mainCRTStartup lets a WIN32 (no console)
-    # program keep a normal int main().
-    target_compile_options(RawAim PRIVATE /W4 /permissive- /utf-8 /MP)
+    # mainCRTStartup lets a WIN32 (no console) program keep a normal int main().
     target_link_options(RawAim PRIVATE /ENTRY:mainCRTStartup)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT RawAim)
-else()
-    target_compile_options(RawAim PRIVATE -Wall -Wextra -Wpedantic -Wshadow -Wconversion)
-    target_link_options(RawAim PRIVATE -static -static-libgcc -static-libstdc++)
 endif()
+
+# ---------------------------------------------------------------------------
+# Console tool that runs the math self-test without opening a window
+# (used by CI; you can also run build/Release/RawAimSelfTest.exe yourself).
+add_executable(RawAimSelfTest
+    src/selftest_main.cpp
+    src/selftest.cpp
+    src/camera.cpp
+    src/crosshair.cpp
+    src/sens_finder.cpp
+    src/stats.cpp
+)
+rawaim_setup(RawAimSelfTest)
