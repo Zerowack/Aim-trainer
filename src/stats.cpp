@@ -110,6 +110,19 @@ double RunStats::MeanRelError() const { return relErrorCount > 0 ? relErrorSum /
 double RunStats::MeanErrNorm() const { return errCount > 0 ? errNormSum / errCount : -1.0; }
 double RunStats::MeanErrDeg() const { return errCount > 0 ? errDegSum / errCount : -1.0; }
 
+int SuggestedSensChangePct(const RunStats& s) {
+    const int dirShots = s.overshoots + s.undershoots;
+    if (dirShots < 6 || s.relErrorCount < 6) return 0;
+    const double share = s.OvershootShare();
+    const double rel = s.MeanRelError();  // + overshoot, - undershoot
+    int pct = static_cast<int>(std::lround(std::fabs(rel) * 100.0));
+    if (pct < 2) pct = 2;
+    if (pct > 15) pct = 15;
+    if (share >= 0.62 && rel > 0.015) return -pct;
+    if (share <= 0.38 && rel < -0.015) return pct;
+    return 0;
+}
+
 std::vector<std::string> BuildTips(const RunStats& s, double sens) {
     std::vector<std::string> tips;
 
@@ -117,15 +130,13 @@ std::vector<std::string> BuildTips(const RunStats& s, double sens) {
     const int dirShots = s.overshoots + s.undershoots;
     if (dirShots >= 6 && s.relErrorCount >= 6) {
         const double share = s.OvershootShare();
-        const double rel = s.MeanRelError();  // + overshoot, - undershoot
-        int pct = static_cast<int>(std::lround(std::fabs(rel) * 100.0));
-        if (pct < 2) pct = 2;
-        if (pct > 15) pct = 15;
-        if (share >= 0.62 && rel > 0.015) {
+        const int change = SuggestedSensChangePct(s);
+        const int pct = change < 0 ? -change : change;
+        if (change < 0) {
             const double suggested = sens * (1.0 - pct / 100.0);
             tips.push_back("You overshoot flicks (" + Fmt(share * 100.0, 0) + "% of directional misses). Try lowering sens ~" +
                            std::to_string(pct) + "% (" + Fmt(sens, 3) + " -> " + Fmt(suggested, 3) + ").");
-        } else if (share <= 0.38 && rel < -0.015) {
+        } else if (change > 0) {
             const double suggested = sens * (1.0 + pct / 100.0);
             tips.push_back("You undershoot flicks (" + Fmt((1.0 - share) * 100.0, 0) +
                            "% of directional misses). Try raising sens ~" + std::to_string(pct) + "% (" + Fmt(sens, 3) +

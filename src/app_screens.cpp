@@ -230,7 +230,21 @@ void App::ScreenResults() {
         ty += TextBlock(tip, tipsR.x + 44.0f, ty, tipsR.width - 80.0f, 22.0f, theme::kText) + 10.0f;
     }
 
-    const float by = 780.0f;
+    // Automatic coach sens change (Settings > Sensitivity > Auto-adjust).
+    if (autoSensApplied_) {
+        const Rectangle ar = {x0, 752.0f, kContentWidth, 56.0f};
+        Angled(ar, theme::kPanel2, 12.0f);
+        Fill(Rectangle{ar.x, ar.y, 5.0f, ar.height - 12.0f}, theme::kWarn);
+        Text(TextFormat("Coach changed your sens %.3f -> %.3f (%+d%%). Set it in Valorant too.", autoSensBefore_, cfg_.sens,
+                        autoSensPct_),
+             ar.x + 24.0f, ar.y + 16.0f, 22.0f, theme::kText);
+        if (Button(Rectangle{ar.x + ar.width - 190.0f, ar.y + 6.0f, 180.0f, 44.0f}, "UNDO")) {
+            SetSens(autoSensBefore_);
+            autoSensApplied_ = false;
+        }
+    }
+
+    const float by = 830.0f;
     if (Button(Rectangle{x0, by, 300.0f, 64.0f}, "PLAY AGAIN", true) || input::BindPressed(cfg_.keys.restart) ||
         IsKeyPressed(KEY_ENTER)) {
         StartRun(s.mode, false);
@@ -245,8 +259,9 @@ void App::ScreenResults() {
         screen_ = Screen::MainMenu;
         return;
     }
-    Text(TextFormat("Played at sens %.3f / %.0f DPI (%.1f cm/360). Saved to stats.csv.", cfg_.sens, cfg_.dpi,
-                    val::Cm360(cfg_.dpi, cfg_.sens)),
+    const double playedSens = autoSensApplied_ ? autoSensBefore_ : cfg_.sens;
+    Text(TextFormat("Played at sens %.3f / %.0f DPI (%.1f cm/360). Saved to stats.csv.", playedSens, cfg_.dpi,
+                    val::Cm360(cfg_.dpi, playedSens)),
          x0, by + 90.0f, 18.0f, theme::kTextDim);
 }
 
@@ -312,6 +327,13 @@ void App::SettingsSensitivity(float x, float y, float w) {
     TextBlock(TextFormat("One count at your sens = %.4f degrees. A full 360 needs %.0f counts.", val::DegreesPerCount(cfg_.sens),
                          360.0 / val::DegreesPerCount(cfg_.sens)),
               x, y + 390.0f, w * 0.75f, 20.0f, theme::kText);
+
+    Toggle(Rectangle{x, y + 450.0f, std::min(760.0f, w), 50.0f}, "Auto-adjust sens from coach", &cfg_.autoSens);
+    TextBlock("When on, the coach's over/undershoot suggestion (for example \"you overshoot, lower sens ~5%\") is "
+              "applied to your sens automatically after each run, 2-15% at a time. It only changes when a run has enough "
+              "flick data (6+ directional misses) and a clear tendency. The results screen shows the change and has "
+              "an UNDO button. Remember to copy the new value into Valorant.",
+              x, y + 510.0f, w * 0.75f, 20.0f, theme::kTextDim);
 }
 
 void App::SettingsVideo(float x, float y, float w) {
@@ -323,6 +345,16 @@ void App::SettingsVideo(float x, float y, float w) {
         ApplyDisplayMode();
     }
     Stepper(Rectangle{x, y + 70.0f, cw, 50.0f}, "FPS cap", &cfg_.fpsCapIndex, kFpsCapNames, kFpsCapCount);
+    if (cfg_.fpsCapIndex == kFpsCapCustomIndex) {
+        // Any cap from 30 to 2000 FPS.
+        double fps = 0.0;
+        if (TextBox(Rectangle{x + cw + 20.0f, y + 70.0f, 140.0f, 50.0f}, 12, &customFpsText_, 4, true) &&
+            ParseNumber(customFpsText_, kCustomFpsMin, kCustomFpsMax, fps)) {
+            cfg_.customFpsCap = static_cast<int>(std::lround(fps));
+        }
+        Text(TextFormat("FPS  (%d-%d, now %d)", kCustomFpsMin, kCustomFpsMax, cfg_.FpsCap()), x + cw + 175.0f, y + 84.0f,
+             20.0f, theme::kTextDim);
+    }
     Toggle(Rectangle{x, y + 140.0f, cw, 50.0f}, "Show FPS counter + frame time", &cfg_.showFps);
     Toggle(Rectangle{x, y + 200.0f, cw, 50.0f}, "Show FOV / sens info in game", &cfg_.showFovInfo);
 

@@ -139,6 +139,7 @@ void App::SetSens(double sens) {
 
 void App::SyncSensText() {
     dpiText_ = Trimmed(cfg_.dpi, 0);
+    customFpsText_ = std::to_string(cfg_.customFpsCap);
     sensText_ = Trimmed(cfg_.sens, 4);
 }
 
@@ -222,7 +223,7 @@ void App::Frame() {
     if (screen_ == Screen::Playing && live_ && !paused_ && mode_) mode_->OnPresented(clock_.Game(platform::Now()));
 
     // 7) Optional frame cap (precise sleep + spin, no vsync).
-    int cap = kFpsCapValues[cfg_.fpsCapIndex];
+    int cap = cfg_.FpsCap();
     if (screen_ != Screen::Playing && (cap == 0 || cap > kMenuFpsLimit)) cap = kMenuFpsLimit;
     if (IsWindowMinimized()) cap = 30;
     if (cap > 0) {
@@ -294,6 +295,16 @@ void App::EndRun() {
     stats_.Append(MakeRecord(s, cfg_.sens, cfg_.dpi));
     lastStats_ = s;
     lastTips_ = BuildTips(s, cfg_.sens);
+
+    // Optional: let the coach apply its over/undershoot sens suggestion.
+    autoSensApplied_ = false;
+    const int pct = SuggestedSensChangePct(s);
+    if (cfg_.autoSens && pct != 0) {
+        autoSensBefore_ = cfg_.sens;
+        autoSensPct_ = pct;
+        SetSens(cfg_.sens * (1.0 + pct / 100.0));
+        autoSensApplied_ = std::fabs(cfg_.sens - autoSensBefore_) > 1e-9;
+    }
     screen_ = Screen::Results;
 }
 

@@ -7,6 +7,7 @@
 #include "camera.h"
 #include "crosshair.h"
 #include "sens_finder.h"
+#include "stats.h"
 
 namespace {
 
@@ -127,6 +128,29 @@ bool RunSelfTest(std::string& report) {
         ss[1].dpi = 1600.0;
         ss[1].recommended = 0.2;
         c.Near("combined recommendation (same cm/360)", CombinedRecommendation(ss, 800.0), 0.4, 1e-9);
+    }
+
+    // --- Coach sens suggestion (also used by auto-adjust) -------------------
+    {
+        RunStats over;
+        over.overshoots = 14;
+        over.undershoots = 4;
+        over.relErrorSum = 0.06 * 18;
+        over.relErrorCount = 18;
+        c.True("coach: overshooting 6% -> lower sens 6%", SuggestedSensChangePct(over) == -6);
+        RunStats under = over;
+        under.overshoots = 3;
+        under.undershoots = 15;
+        under.relErrorSum = -0.25 * 18;  // clamps to the 15% maximum
+        c.True("coach: undershooting -> raise sens (max 15%)", SuggestedSensChangePct(under) == 15);
+        RunStats balanced = over;
+        balanced.overshoots = 9;
+        balanced.undershoots = 9;
+        c.True("coach: balanced -> no change", SuggestedSensChangePct(balanced) == 0);
+        RunStats few = over;
+        few.overshoots = 3;
+        few.undershoots = 1;
+        c.True("coach: too little data -> no change", SuggestedSensChangePct(few) == 0);
     }
 
     // --- Crosshair share code round trip ------------------------------------

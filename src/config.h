@@ -8,9 +8,12 @@
 
 enum class DisplayMode : int { Fullscreen = 0, Borderless = 1, Windowed = 2 };
 
-// FPS cap choices. Index 0 = uncapped.
-constexpr int kFpsCapCount = 4;
-extern const int kFpsCapValues[kFpsCapCount];    // 0, 144, 240, 360
+// FPS cap choices. Index 0 = uncapped, the last one = custom value.
+constexpr int kFpsCapCount = 5;
+constexpr int kFpsCapCustomIndex = kFpsCapCount - 1;
+constexpr int kCustomFpsMin = 30;
+constexpr int kCustomFpsMax = 2000;
+extern const int kFpsCapValues[kFpsCapCount];    // 0, 144, 240, 360, (custom)
 extern const char* const kFpsCapNames[kFpsCapCount];
 
 struct Keybinds {
@@ -26,12 +29,15 @@ struct Config {
     // Sensitivity
     double dpi = 800.0;
     double sens = 0.4;
+    // Apply the coach's over/undershoot sens suggestion automatically after runs.
+    bool autoSens = false;
 
     // Video
     DisplayMode displayMode = DisplayMode::Fullscreen;
     int windowWidth = 1600;
     int windowHeight = 900;
     int fpsCapIndex = 0;      // uncapped by default
+    int customFpsCap = 165;   // used when fpsCapIndex == kFpsCapCustomIndex
     bool showFps = true;
     bool showFovInfo = true;
 
@@ -49,6 +55,8 @@ struct Config {
     Crosshair crosshair;
 
     Config();
+    // Frame cap in FPS for gameplay (0 = uncapped).
+    int FpsCap() const;
     // Missing files/keys simply keep defaults. Returns false if no file existed.
     bool Load(const std::string& path);
     bool Save(const std::string& path) const;

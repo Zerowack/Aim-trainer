@@ -55,6 +55,11 @@ struct RunStats {
     double MeanErrDeg() const;          // < 0 if no data
 };
 
+// The coach's sensitivity suggestion from over/undershoot data, in percent
+// (e.g. -6 = lower sens by 6%). 0 when there is not enough data or the
+// tendency is balanced.
+int SuggestedSensChangePct(const RunStats& s);
+
 // Data-driven coaching tips for the results screen.
 std::vector<std::string> BuildTips(const RunStats& s, double sens);
 

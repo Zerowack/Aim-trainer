@@ -7,8 +7,8 @@
 
 #include "input.h"
 
-const int kFpsCapValues[kFpsCapCount] = {0, 144, 240, 360};
-const char* const kFpsCapNames[kFpsCapCount] = {"Uncapped", "144", "240", "360"};
+const int kFpsCapValues[kFpsCapCount] = {0, 144, 240, 360, 0};
+const char* const kFpsCapNames[kFpsCapCount] = {"Uncapped", "144", "240", "360", "Custom"};
 
 namespace {
 
@@ -54,6 +54,11 @@ Config::Config() {
     keys.toggleFps = KEY_F2;
 }
 
+int Config::FpsCap() const {
+    if (fpsCapIndex == kFpsCapCustomIndex) return ClampI(customFpsCap, kCustomFpsMin, kCustomFpsMax);
+    return kFpsCapValues[ClampI(fpsCapIndex, 0, kFpsCapCount - 1)];
+}
+
 bool Config::Load(const std::string& path) {
     std::ifstream in(path);
     if (!in) return false;
@@ -71,11 +76,13 @@ bool Config::Load(const std::string& path) {
     firstRunDone = GetB(kv, "first_run_done", firstRunDone);
     dpi = ClampD(GetD(kv, "dpi", dpi), 50.0, 32000.0);
     sens = ClampD(GetD(kv, "sens", sens), 0.001, 20.0);
+    autoSens = GetB(kv, "auto_sens", autoSens);
 
     displayMode = static_cast<DisplayMode>(ClampI(GetI(kv, "display_mode", static_cast<int>(displayMode)), 0, 2));
     windowWidth = ClampI(GetI(kv, "window_width", windowWidth), 640, 7680);
     windowHeight = ClampI(GetI(kv, "window_height", windowHeight), 360, 4320);
     fpsCapIndex = ClampI(GetI(kv, "fps_cap_index", fpsCapIndex), 0, kFpsCapCount - 1);
+    customFpsCap = ClampI(GetI(kv, "custom_fps_cap", customFpsCap), kCustomFpsMin, kCustomFpsMax);
     showFps = GetB(kv, "show_fps", showFps);
     showFovInfo = GetB(kv, "show_fov_info", showFovInfo);
 
@@ -109,10 +116,12 @@ bool Config::Save(const std::string& path) const {
     out << "first_run_done=" << (firstRunDone ? 1 : 0) << "\n";
     out << "dpi=" << dpi << "\n";
     out << "sens=" << sens << "\n";
+    out << "auto_sens=" << (autoSens ? 1 : 0) << "\n";
     out << "display_mode=" << static_cast<int>(displayMode) << "   # 0=fullscreen 1=borderless 2=windowed\n";
     out << "window_width=" << windowWidth << "\n";
     out << "window_height=" << windowHeight << "\n";
-    out << "fps_cap_index=" << fpsCapIndex << "   # 0=uncapped 1=144 2=240 3=360\n";
+    out << "fps_cap_index=" << fpsCapIndex << "   # 0=uncapped 1=144 2=240 3=360 4=custom\n";
+    out << "custom_fps_cap=" << customFpsCap << "\n";
     out << "show_fps=" << (showFps ? 1 : 0) << "\n";
     out << "show_fov_info=" << (showFovInfo ? 1 : 0) << "\n";
     out << "run_seconds=" << runSeconds << "\n";

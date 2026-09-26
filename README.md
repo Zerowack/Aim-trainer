@@ -9,7 +9,7 @@ Valorant:
 - **Every raw packet counts:** all mouse packets between frames are applied in order,
   so nothing is lost at 1000–8000 Hz polling. Each click is judged at the exact
   crosshair position where it happened, even in the middle of a frame.
-- **Timing:** FPS is uncapped by default with V-Sync off. You can set an optional cap (144/240/360),
+- **Timing:** FPS is uncapped by default with V-Sync off. You can set an optional cap (144/240/360, or any custom value from 30 to 2000),
   and an FPS counter shows frame time. All timing uses `QueryPerformanceCounter`.
 - **Six modes:** Gridshot, Microshot, Tracking (ADAD strafes), Flick 180, Reaction and Peek Practice.
 - **Sens Finder:** uses the Perfect Sensitivity Approximation (PSA) method. It runs 7 rounds of blind A/B
@@ -185,7 +185,13 @@ Alt-tab or any focus loss pauses the run and releases the cursor immediately.
    window, like holding an angle. Headshots score extra.
 
 **Results:** score, accuracy, hits/misses, average reaction time, average TTK,
-over/undershoot, average click error and coaching tips. Everything is appended to
+over/undershoot, average click error and coaching tips.
+
+**Auto-adjust sens (optional):** turn on Settings → Sensitivity → *Auto-adjust sens from coach*
+and the coach's over/undershoot suggestion is applied to your sens after each run
+(2–15% at a time). It only changes when the run has enough flick data and a clear
+tendency. The results screen shows the old and new value with an **UNDO** button.
+Copy the new value into Valorant to keep both games the same. Everything is appended to
 `stats.csv`. **Stats & Progress** shows per-mode graphs, personal bests and recent runs.
 
 **Sens Finder (PSA):**

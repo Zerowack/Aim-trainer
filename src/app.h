@@ -130,6 +130,9 @@ private:
     std::vector<std::string> lastTips_;
     bool lastWasPb_ = false;
     long long previousBest_ = 0;
+    bool autoSensApplied_ = false;   // coach changed the sens after the last run
+    double autoSensBefore_ = 0.0;
+    int autoSensPct_ = 0;
     bool hadPreviousBest_ = false;
 
     // --- sens finder
@@ -146,6 +149,7 @@ private:
     long long rebindStartFrame_ = 0;
     std::string dpiText_;
     std::string sensText_;
+    std::string customFpsText_;
     std::string xhCodeText_;
     std::string xhMessage_;
     int statsMode_ = 0;
