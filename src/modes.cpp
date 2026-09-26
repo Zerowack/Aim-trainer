@@ -60,10 +60,10 @@ Mode::Mode(ModeId id, const GameContext& ctx) : id_(id), ctx_(ctx) {
 
 SniperSpec GetSniperSpec(SniperWeapon w) {
     switch (w) {
-        //                  name       mag  interval       reload zoom1 zoom2 hip spread
-        case SniperWeapon::Marshal: return {"Marshal", 5, 1.0 / 1.5, 2.5, 3.5, 0.0, 1.2};
-        case SniperWeapon::Outlaw: return {"Outlaw", 2, 1.0 / 2.75, 2.5, 3.5, 0.0, 2.2};
-        default: return {"Operator", 5, 1.0 / 0.6, 3.7, 2.5, 5.0, 5.0};
+        //                           name     mag  interval   reload zoom1 zoom2 hip  head   body   legs  move speed
+        case SniperWeapon::Marshal: return {"Marshal", 5, 1.0 / 1.5, 2.5, 3.5, 0.0, 1.2, 202.0, 101.0, 85.0, 3.0, 1.0};
+        case SniperWeapon::Outlaw: return {"Outlaw", 2, 1.0 / 2.75, 2.5, 3.5, 0.0, 2.2, 238.0, 140.0, 119.0, 4.0, 0.95};
+        default: return {"Operator", 5, 1.0 / 0.6, 3.7, 2.5, 5.0, 5.0, 255.0, 150.0, 127.0, 6.0, 0.95};
     }
 }
 
@@ -900,178 +900,6 @@ private:
     double lastPlacementTime_ = -10.0;
 };
 
-// ===========================================================================
-// Sniper: pick agents off at 20-36 m with a Marshal, Outlaw or Operator.
-// Right mouse scopes (Operator: 2.5x -> 5x -> unscoped). Scoped shots are
-// perfectly accurate; unscoped shots get the rifle's hipfire spread. Agents
-// only appear once the rifle is ready, so the fire rate never limits score.
-
-class SniperMode : public Mode {
-public:
-    explicit SniperMode(const GameContext& ctx) : Mode(ModeId::Sniper, ctx), spec_(GetSniperSpec(ctx.weapon)) {}
-
-    void Begin(double t) override {
-        targets_.clear();
-        ammo_ = spec_.magazine;
-        readyAt_ = t;
-        nextAt_ = t + ctx_.rng->Uniform(0.6, 1.2);
-    }
-
-    void Update(double t, double dt, bool /*triggerHeld*/) override {
-        TickTargets(dt);
-        UpdateReactionOnset(t);
-        if (reloading_ && t >= readyAt_) {
-            reloading_ = false;
-            ammo_ = spec_.magazine;
-        }
-        if (targets_.empty()) {
-            // Wait for both the spawn timer and the rifle.
-            if (t >= nextAt_ && t + 0.25 >= readyAt_) Spawn();
-        } else {
-            Target& tg = targets_[0];
-            if (strafe_ && tg.presented) {
-                tg.pos.x += static_cast<float>(strafeDir_ * 2.4 * ctx_.diff.speed * dt);
-                if (t >= strafeFlipAt_) {
-                    strafeDir_ = -strafeDir_;
-                    strafeFlipAt_ = t + ctx_.rng->Uniform(0.3, 0.8);
-                }
-            }
-            if (tg.presented && t - tg.spawnTime > tg.lifetime) {
-                stats_.expired++;
-                stats_.score -= 50;
-                targets_.clear();
-                nextAt_ = t + ctx_.rng->Uniform(0.5, 1.1);
-            }
-        }
-    }
-
-    void OnShot(double t) override {
-        if (reloading_ || t < readyAt_ || ammo_ <= 0) {
-            ctx_.audio->Play(Sfx::UiClick);  // dry click: rifle not ready
-            return;
-        }
-        Mode::OnShot(t);
-        --ammo_;
-        readyAt_ = t + spec_.shotInterval;
-        if (ammo_ <= 0) {
-            reloading_ = true;
-            readyAt_ = t + spec_.reloadTime;
-            zoomLevel_ = 0;  // reloading drops the scope, like in Valorant
-        }
-    }
-
-    void OnButton(int bindCode, bool down, double /*t*/) override {
-        if (bindCode != ctx_.scopeBind) return;
-        if (reloading_) return;
-        if (ctx_.scopeHold) {
-            zoomLevel_ = down ? 1 : 0;
-            return;
-        }
-        if (!down) return;
-        const int levels = spec_.zoom2 > 0.0 ? 2 : 1;
-        zoomLevel_ = (zoomLevel_ + 1) % (levels + 1);
-    }
-
-    double Zoom() const override {
-        if (zoomLevel_ == 1) return spec_.zoom1;
-        if (zoomLevel_ == 2) return spec_.zoom2;
-        return 1.0;
-    }
-
-    bool HideCrosshair() const override { return zoomLevel_ > 0; }
-
-    void DrawOverlay() const override {
-        if (zoomLevel_ > 0) {
-            // Scope: black outside a circle, thin black reticle inside.
-            const Vector2 c = {static_cast<float>(GetScreenWidth()) * 0.5f, static_cast<float>(GetScreenHeight()) * 0.5f};
-            const float r = static_cast<float>(GetScreenHeight()) * 0.47f;
-            const float far = static_cast<float>(GetScreenWidth() + GetScreenHeight());
-            DrawRing(c, r, far, 0.0f, 360.0f, 96, BLACK);
-            DrawRing(c, r - 3.0f, r, 0.0f, 360.0f, 96, Color{20, 20, 20, 255});
-            const float th = std::max(1.0f, ui::Scale());
-            DrawLineEx(Vector2{c.x - r, c.y}, Vector2{c.x - 6.0f, c.y}, th, BLACK);
-            DrawLineEx(Vector2{c.x + 6.0f, c.y}, Vector2{c.x + r, c.y}, th, BLACK);
-            DrawLineEx(Vector2{c.x, c.y - r}, Vector2{c.x, c.y - 6.0f}, th, BLACK);
-            DrawLineEx(Vector2{c.x, c.y + 6.0f}, Vector2{c.x, c.y + r}, th, BLACK);
-            DrawCircleV(c, std::max(1.5f, 1.5f * ui::Scale()), Color{255, 70, 80, 255});
-        }
-    }
-
-    void DrawHud(double t) const override {
-        const float vw = ui::VW(), vh = ui::VH();
-        // Weapon panel (bottom right).
-        const Rectangle p = {vw - 300.0f, vh - 130.0f, 286.0f, 100.0f};
-        ui::Angled(p, ui::Alpha(ui::theme::kBg, 0.8f), 14.0f);
-        ui::TextBold(spec_.name, p.x + 18.0f, p.y + 12.0f, 26.0f, ui::theme::kText);
-        const char* zoomText = zoomLevel_ == 0 ? "UNSCOPED" : TextFormat("%.1fx", Zoom());
-        ui::Text(zoomText, p.x + p.width - 18.0f, p.y + 18.0f, 18.0f, zoomLevel_ ? ui::theme::kGood : ui::theme::kTextDim,
-                 ui::Align::Right);
-        if (reloading_) {
-            const float k = static_cast<float>(Clamp(1.0 - (readyAt_ - t) / spec_.reloadTime, 0.0, 1.0));
-            ui::Text("RELOADING", p.x + 18.0f, p.y + 52.0f, 20.0f, ui::theme::kWarn);
-            ui::Fill(Rectangle{p.x + 18.0f, p.y + 80.0f, (p.width - 36.0f) * k, 5.0f}, ui::theme::kWarn);
-        } else {
-            for (int i = 0; i < spec_.magazine; ++i) {
-                ui::Fill(Rectangle{p.x + 18.0f + static_cast<float>(i) * 22.0f, p.y + 54.0f, 14.0f, 28.0f},
-                         i < ammo_ ? ui::theme::kText : ui::Alpha(ui::theme::kTextDim, 0.3f));
-            }
-            if (t < readyAt_) {
-                const float k = static_cast<float>(Clamp(1.0 - (readyAt_ - t) / spec_.shotInterval, 0.0, 1.0));
-                ui::Fill(Rectangle{p.x + 18.0f, p.y + 88.0f, (p.width - 36.0f) * k, 3.0f}, ui::theme::kAccent);
-            }
-        }
-    }
-
-protected:
-    bool AimHead() const override { return true; }
-    double TtkStart(const Target& target) const override { return target.spawnTime; }
-
-    Ray ShotRay() override {
-        Ray ray = ctx_.cam->AimRay();
-        if (zoomLevel_ > 0) return ray;  // scoped: perfectly accurate
-        // Unscoped: random direction inside the hipfire cone.
-        const double a = ctx_.rng->Uniform(0.0, 2.0 * val::kPi);
-        const double rad = spec_.hipSpreadDeg * std::sqrt(ctx_.rng->Uniform(0.0, 1.0));
-        ray.direction = DirectionFromAngles(ctx_.cam->Yaw() + std::cos(a) * rad, ctx_.cam->Pitch() + std::sin(a) * rad);
-        return ray;
-    }
-
-    void OnHit(size_t /*index*/, const TargetHit& hit, double t) override {
-        const double exposed = t - targets_[0].spawnTime;
-        stats_.score += 150 + (hit.head ? 100 : 0) + static_cast<long long>(std::lround(Clamp(1.0 - exposed / 1.5, 0.0, 1.0) * 100.0)) +
-                        (zoomLevel_ == 0 ? 100 : 0);  // no-scope bonus
-        ctx_.audio->Play(hit.head ? Sfx::Headshot : Sfx::Kill);
-        targets_.clear();
-        nextAt_ = t + ctx_.rng->Uniform(0.5, 1.1);
-    }
-
-private:
-    void Spawn() {
-        const double yaw = ctx_.rng->Uniform(-50.0, 50.0);
-        const double dist = ctx_.rng->Uniform(20.0, 34.0) / static_cast<double>(ctx_.diff.size);
-        const Vector3 d = DirectionFromAngles(yaw, 0.0);
-        const float k = static_cast<float>(std::min(dist, 37.0));
-        Target tg;
-        tg.kind = TargetKind::Humanoid;
-        tg.pos = Vector3{d.x * k, 0.0f, d.z * k};
-        tg.lifetime = 1.8 * ctx_.diff.time;
-        targets_.push_back(tg);
-        // Hard / Insane agents strafe while visible.
-        strafe_ = ctx_.difficulty == Difficulty::Hard || ctx_.difficulty == Difficulty::Insane;
-        strafeDir_ = ctx_.rng->Sign();
-        strafeFlipAt_ = 0.0;
-    }
-
-    SniperSpec spec_;
-    int ammo_ = 5;
-    bool reloading_ = false;
-    double readyAt_ = 0.0;
-    double nextAt_ = 0.0;
-    int zoomLevel_ = 0;
-    bool strafe_ = false;
-    int strafeDir_ = 1;
-    double strafeFlipAt_ = 0.0;
-};
 
 // ===========================================================================
 // Mixed test for the sensitivity finder (20 s):
@@ -1183,7 +1011,7 @@ std::unique_ptr<Mode> CreateMode(ModeId id, const GameContext& ctx) {
         case ModeId::Reaction: return std::make_unique<ReactionMode>(ctx);
         case ModeId::Peek: return std::make_unique<PeekMode>(ctx);
         case ModeId::Placement: return std::make_unique<PlacementMode>(ctx);
-        case ModeId::Sniper: return std::make_unique<SniperMode>(ctx);
+        case ModeId::Sniper: return CreateSniperMode(ctx);
         case ModeId::VsBot: return CreateVsBotMode(ctx);
         case ModeId::Mixed: return std::make_unique<MixedMode>(ctx);
         default: return std::make_unique<GridshotMode>(ctx);

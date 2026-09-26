@@ -214,8 +214,9 @@ float HoverAnim(Rectangle r, bool enabled) {
                          static_cast<uint64_t>(static_cast<uint32_t>(std::lround(r.y * 3.0f + r.width)));
     float& v = g_hoverAnim[key];
     const float target = (enabled && Hover(r)) ? 1.0f : 0.0f;
-    const float step = std::min(1.0f, GetFrameTime() * 14.0f);
-    v += (target - v) * step;
+    // Highlight instantly (any delay reads as input lag), fade out quickly.
+    if (target > v) v = target;
+    else v += (target - v) * std::min(1.0f, GetFrameTime() * 20.0f);
     if (g_hoverAnim.size() > 4096) g_hoverAnim.clear();  // screen layouts change; keep it small
     return v;
 }

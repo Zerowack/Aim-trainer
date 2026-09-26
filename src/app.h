@@ -17,7 +17,7 @@
 #include "stats.h"
 #include "world.h"
 
-constexpr const char* kAppVersion = "1.8.0";
+constexpr const char* kAppVersion = "1.9.0";
 
 // Game clock = real time minus all time spent paused.
 struct GameClock {
@@ -156,7 +156,6 @@ private:
     double autoSensBefore_ = 0.0;
     int autoSensPct_ = 0;
     bool hadPreviousBest_ = false;
-    double resultsShownAt_ = 0.0;
     bool lastRunRanked_ = false;
     AimRank lastRunRank_;
     bool lastModeRanked_ = false;

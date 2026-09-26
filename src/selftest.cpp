@@ -205,6 +205,23 @@ bool RunSelfTest(std::string& report) {
         c.True("rank: placement 6.5 deg = Gold 1", RankFromRecord(pl, r) && RankLabel(r) == "Gold 1");
         pl.placementErr = 1.0;
         c.True("rank: placement 1.0 deg = Radiant", RankFromRecord(pl, r) && RankLabel(r) == "Radiant");
+        RunRecord sn;
+        sn.mode = ModeId::Sniper;
+        sn.duration = 60.0;
+        sn.peeks = 18;
+        sn.kills = 18;
+        sn.deaths = 0;
+        sn.accuracy = 95.0;
+        sn.avgTtkMs = 300.0;  // every peek killed, fast: 1.0 x 0.95 x 1.0
+        c.True("rank: sniper 18/18 peeks at 300 ms = Radiant", RankFromRecord(sn, r) && RankLabel(r) == "Radiant");
+        sn.peeks = 12;
+        sn.kills = 6;
+        sn.deaths = 2;
+        sn.accuracy = 60.0;
+        sn.avgTtkMs = 700.0;  // (6 - 1) / 12 x 0.6 x 0.5625 = 0.14
+        c.True("rank: sniper 6/12 with 2 deaths = Bronze 3", RankFromRecord(sn, r) && RankLabel(r) == "Bronze 3");
+        sn.peeks = -1;  // a run from the old sniper mode
+        c.True("rank: old sniper runs are not ranked", !RankFromRecord(sn, r));
         RunRecord shortRun = g;
         shortRun.duration = 10.0;
         c.True("rank: runs under 20 s are not ranked", !RankFromRecord(shortRun, r));

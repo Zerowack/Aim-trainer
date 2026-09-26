@@ -9,26 +9,13 @@
 #include <string>
 
 #include "modes.h"
+#include "movement.h"
 #include "rank.h"
 #include "ui.h"
 
 namespace {
 
-// ---- Movement (metres, seconds) --------------------------------------------
-constexpr float kRunSpeed = 5.40f;     // rifle running speed
-constexpr float kWalkSpeed = 2.90f;    // Shift-walk (silent)
-constexpr float kCrouchSpeed = 1.90f;  // crouch-walk
-constexpr float kAccel = 55.0f;        // with input: full speed in ~0.1 s, counter-strafe stop in ~0.1 s
-constexpr float kFriction = 28.0f;     // keys released: stop from a run in ~0.2 s
-constexpr float kAirAccel = 8.0f;
-constexpr float kJumpSpeed = 5.2f;
-constexpr float kGravity = 15.0f;
-constexpr float kStandEye = 1.60f;
-constexpr float kCrouchEye = 1.12f;
-constexpr float kCrouchRate = 1.0f / 0.12f;  // full crouch in 0.12 s
-constexpr float kRadius = 0.35f;
-constexpr float kAccurateSpeed = 1.35f;  // at or below this the first shot is accurate (~25% of run speed)
-constexpr float kFootstepSpeed = 3.2f;   // faster than walking = audible footsteps
+using namespace mv;
 
 // ---- Rifle (Vandal-like) ----------------------------------------------------
 constexpr double kFireInterval = 1.0 / 9.75;
@@ -79,89 +66,6 @@ BotSkill SkillFor(int tier) {
     return table[std::max(0, std::min(kTierCount - 1, tier))];
 }
 
-// Something that walks around: feet position, velocity, crouch amount.
-struct Mover {
-    Vector3 pos = {0.0f, 0.0f, 0.0f};
-    Vector3 vel = {0.0f, 0.0f, 0.0f};
-    float crouch = 0.0f;
-    bool onGround = true;
-
-    float Speed() const { return std::sqrt(vel.x * vel.x + vel.z * vel.z); }
-    float EyeHeight() const { return kStandEye + (kCrouchEye - kStandEye) * crouch; }
-    Vector3 Eye() const { return Vector3{pos.x, pos.y + EyeHeight(), pos.z}; }
-};
-
-// Valorant-style ground movement: quick acceleration towards the wished
-// velocity, friction when no key is held. Pressing the opposite key uses the
-// (stronger) acceleration, which is why counter-strafing stops you faster.
-void Accelerate(Mover& m, float wishX, float wishZ, float wishSpeed, float dt) {
-    if (!m.onGround) {
-        m.vel.x += wishX * kAirAccel * dt;
-        m.vel.z += wishZ * kAirAccel * dt;
-        return;
-    }
-    if (wishSpeed > 0.0f && (wishX != 0.0f || wishZ != 0.0f)) {
-        const float dvx = wishX * wishSpeed - m.vel.x;
-        const float dvz = wishZ * wishSpeed - m.vel.z;
-        const float len = std::sqrt(dvx * dvx + dvz * dvz);
-        const float maxDv = kAccel * dt;
-        const float k = len > maxDv ? maxDv / len : 1.0f;
-        m.vel.x += dvx * k;
-        m.vel.z += dvz * k;
-    } else {
-        const float sp = m.Speed();
-        if (sp > 0.0f) {
-            const float ns = std::max(0.0f, sp - kFriction * dt);
-            m.vel.x *= ns / sp;
-            m.vel.z *= ns / sp;
-        }
-    }
-}
-
-// Circle-vs-box collision on the ground plane (boxes block everything).
-void Collide(Mover& m, const std::vector<Box>& boxes) {
-    for (int pass = 0; pass < 3; ++pass) {
-        for (const Box& b : boxes) {
-            const float hx = b.size.x * 0.5f, hz = b.size.z * 0.5f;
-            const float cx = std::max(b.center.x - hx, std::min(m.pos.x, b.center.x + hx));
-            const float cz = std::max(b.center.z - hz, std::min(m.pos.z, b.center.z + hz));
-            float dx = m.pos.x - cx, dz = m.pos.z - cz;
-            const float d2 = dx * dx + dz * dz;
-            if (d2 >= kRadius * kRadius) continue;
-            if (d2 > 1e-8f) {
-                const float d = std::sqrt(d2);
-                const float push = kRadius - d;
-                m.pos.x += dx / d * push;
-                m.pos.z += dz / d * push;
-                // Remove the velocity component going into the box.
-                const float nx = dx / d, nz = dz / d;
-                const float vn = m.vel.x * nx + m.vel.z * nz;
-                if (vn < 0.0f) {
-                    m.vel.x -= vn * nx;
-                    m.vel.z -= vn * nz;
-                }
-            } else {
-                // Centre inside the box: push out along the shallowest axis.
-                const float ox = hx + kRadius - std::fabs(m.pos.x - b.center.x);
-                const float oz = hz + kRadius - std::fabs(m.pos.z - b.center.z);
-                if (ox < oz) m.pos.x += (m.pos.x >= b.center.x ? ox : -ox);
-                else m.pos.z += (m.pos.z >= b.center.z ? oz : -oz);
-            }
-        }
-    }
-}
-
-void Vertical(Mover& m, float dt) {
-    if (m.onGround) return;
-    m.vel.y -= kGravity * dt;
-    m.pos.y += m.vel.y * dt;
-    if (m.pos.y <= 0.0f) {
-        m.pos.y = 0.0f;
-        m.vel.y = 0.0f;
-        m.onGround = true;
-    }
-}
-
 // First-shot spread (degrees) from movement state.
 double MoveSpread(const Mover& m) {
     if (!m.onGround) return kAirSpread;
@@ -170,25 +74,6 @@ double MoveSpread(const Mover& m) {
     if (sp > kAccurateSpeed) s += kRunSpread * std::min(1.0, (sp - kAccurateSpeed) / (kRunSpeed - kAccurateSpeed));
     if (m.crouch > 0.9f && sp <= kAccurateSpeed) s *= 0.85;  // crouching and still: a little tighter
     return s;
-}
-
-Target BodyOf(const Mover& m) {
-    Target t;
-    t.kind = TargetKind::Humanoid;
-    t.pos = m.pos;
-    t.crouch = m.crouch;
-    t.presented = true;
-    return t;
-}
-
-Vector3 Sub(Vector3 a, Vector3 b) { return Vector3{a.x - b.x, a.y - b.y, a.z - b.z}; }
-float Len(Vector3 v) { return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z); }
-
-double RandNormal(Rng& rng) {
-    // Box-Muller.
-    const double u1 = std::max(1e-9, rng.Uniform(0.0, 1.0));
-    const double u2 = rng.Uniform(0.0, 1.0);
-    return std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * val::kPi * u2);
 }
 
 class VsBotMode : public Mode {
@@ -393,39 +278,8 @@ private:
 
     // ---------------------------------------------------------------- player
     void UpdatePlayer(double t, float dt, bool live, bool triggerHeld) {
-        // Crouch (hold Ctrl).
-        const bool crouchKey = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
-        const float target = crouchKey ? 1.0f : 0.0f;
-        player_.crouch += std::max(-kCrouchRate * dt, std::min(kCrouchRate * dt, target - player_.crouch));
-
-        float wx = 0.0f, wz = 0.0f, speed = 0.0f;
-        if (live) {
-            const double y = val::DegToRad(ctx_.cam->Yaw());
-            const float fx = static_cast<float>(std::sin(y)), fz = static_cast<float>(-std::cos(y));
-            const float rx = static_cast<float>(std::cos(y)), rz = static_cast<float>(std::sin(y));
-            float ix = 0.0f, iz = 0.0f;
-            if (IsKeyDown(KEY_W)) { ix += fx; iz += fz; }
-            if (IsKeyDown(KEY_S)) { ix -= fx; iz -= fz; }
-            if (IsKeyDown(KEY_D)) { ix += rx; iz += rz; }
-            if (IsKeyDown(KEY_A)) { ix -= rx; iz -= rz; }
-            const float len = std::sqrt(ix * ix + iz * iz);
-            if (len > 0.001f) {
-                wx = ix / len;
-                wz = iz / len;
-                const bool walk = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
-                speed = player_.crouch > 0.5f ? kCrouchSpeed : (walk ? kWalkSpeed : kRunSpeed);
-            }
-            if (IsKeyPressed(KEY_SPACE) && player_.onGround) {
-                player_.onGround = false;
-                player_.vel.y = kJumpSpeed;
-            }
-            if (IsKeyPressed(KEY_R) && !reloading_ && ammo_ < kMagazine) StartReload(t);
-        }
-        Accelerate(player_, wx, wz, speed, dt);
-        player_.pos.x += player_.vel.x * dt;
-        player_.pos.z += player_.vel.z * dt;
-        Vertical(player_, dt);
-        Collide(player_, ctx_.world->Covers());
+        StepPlayer(player_, ctx_.cam->Yaw(), live, 1.0f, dt, ctx_.world->Covers());
+        if (live && IsKeyPressed(KEY_R) && !reloading_ && ammo_ < kMagazine) StartReload(t);
         ctx_.cam->SetEye(player_.Eye());
 
         if (reloading_ && t >= readyAt_) {
@@ -531,17 +385,7 @@ private:
     }
 
     // ------------------------------------------------------------------- bot
-    bool CanSee(Vector3 from, const Target& body) const {
-        const Vector3 pts[2] = {TargetAimPoint(body, true), TargetAimPoint(body, false)};
-        for (const Vector3& p : pts) {
-            const Vector3 d = Sub(p, from);
-            const float len = Len(d);
-            if (len < 1e-3f) return true;
-            const Ray ray = {from, Vector3{d.x / len, d.y / len, d.z / len}};
-            if (ctx_.world->RaycastCovers(ray) > len) return true;
-        }
-        return false;
-    }
+    bool CanSee(Vector3 from, const Target& body) const { return mv::CanSee(*ctx_.world, from, body); }
 
     void PickWaypoint() {
         // Later in the round the bot pushes towards the player's side.
@@ -705,24 +549,10 @@ private:
             Turn(ly, lp, 240.0 * dt);
         }
 
-        const float ct = wantCrouch ? 1.0f : 0.0f;
-        bot_.crouch += std::max(-kCrouchRate * dt, std::min(kCrouchRate * dt, ct - bot_.crouch));
-        if (bot_.crouch > 0.5f) speed = std::min(speed, kCrouchSpeed);
-        Accelerate(bot_, wx, wz, speed, dt);
-        bot_.pos.x += bot_.vel.x * dt;
-        bot_.pos.z += bot_.vel.z * dt;
-        Vertical(bot_, dt);
-        Collide(bot_, ctx_.world->Covers());
+        Step(bot_, wx, wz, speed, wantCrouch, dt, ctx_.world->Covers());
     }
 
-    void CounterStrafe(float& wx, float& wz, float& speed) const {
-        const float sp = bot_.Speed();
-        if (sp > 0.3f) {
-            wx = -bot_.vel.x / sp;
-            wz = -bot_.vel.z / sp;
-            speed = 0.01f;  // accelerate against the motion, but don't run the other way
-        }
-    }
+    void CounterStrafe(float& wx, float& wz, float& speed) const { mv::CounterStrafe(bot_, wx, wz, speed); }
 
     void Turn(double goalYaw, double goalPitch, double maxStep) {
         const double dy = val::NormalizeDeg(goalYaw - botYaw_);

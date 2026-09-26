@@ -88,6 +88,7 @@ struct RunStats {
     double damageDealt = 0.0;
     double damageTaken = 0.0;
     int movingShots = 0;     // shots fired while moving too fast to be accurate
+    int peeks = 0;           // Sniper: enemies that peeked (killed or got away)
 
     int Misses() const { return shots - hits; }
     double Accuracy() const;            // 0..1 (tracking uses on-target / firing time)
@@ -132,6 +133,9 @@ struct RunRecord {
     int roundsWon = -1;          // VS Bot only
     int roundsLost = -1;
     int botTier = -1;
+    int kills = -1;              // VS Bot and Sniper
+    int deaths = -1;
+    int peeks = -1;              // Sniper only
 };
 
 RunRecord MakeRecord(const RunStats& s, double sens, double dpi);

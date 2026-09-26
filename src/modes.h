@@ -45,6 +45,11 @@ struct SniperSpec {
     double zoom1;
     double zoom2;         // 0 = only one zoom level
     double hipSpreadDeg;  // unscoped inaccuracy (radius)
+    double headDamage;
+    double bodyDamage;
+    double legDamage;
+    double moveSpreadDeg; // extra inaccuracy at full running speed
+    double speedMult;     // movement speed while holding it
 };
 SniperSpec GetSniperSpec(SniperWeapon w);
 
@@ -160,4 +165,5 @@ protected:
 };
 
 std::unique_ptr<Mode> CreateMode(ModeId id, const GameContext& ctx);
-std::unique_ptr<Mode> CreateVsBotMode(const GameContext& ctx);  // vsbot.cpp
+std::unique_ptr<Mode> CreateVsBotMode(const GameContext& ctx);   // vsbot.cpp
+std::unique_ptr<Mode> CreateSniperMode(const GameContext& ctx);  // sniper.cpp

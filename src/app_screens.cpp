@@ -364,39 +364,38 @@ void App::ScreenResults() {
         StatTile(Rectangle{x0 + static_cast<float>(col) * (tw + 10.0f), 200.0f + static_cast<float>(row) * (th + 12.0f), tw, th},
                  title, value, c);
     };
-    // Score counts up over 0.7 s (ease-out).
-    const double k = std::min(1.0, (platform::Now() - resultsShownAt_) / 0.7);
-    const double eased = 1.0 - (1.0 - k) * (1.0 - k) * (1.0 - k);
-    const long long shown = static_cast<long long>(std::llround(static_cast<double>(s.score) * eased));
+    const long long shown = s.score;  // shown right away (a count-up reads as lag)
     std::string scoreTitle = "SCORE";
     if (hadPreviousBest_ && previousBest_ > 0) {
         const double vsPb = (static_cast<double>(s.score) / static_cast<double>(previousBest_) - 1.0) * 100.0;
         scoreTitle = TextFormat("SCORE  (%+.0f%% vs PB)", vsPb);
     }
-    tile(0, 0, scoreTitle, std::to_string(shown), theme::kAccent);
-    tile(1, 0, s.mode == ModeId::Tracking ? "ACCURACY (ON TARGET WHILE FIRING)" : "ACCURACY", Fmt(s.Accuracy() * 100.0, 1) + "%",
-         theme::kAccent);
-    if (s.mode == ModeId::Tracking) {
-        tile(2, 0, "TIME ON TARGET", Fmt(s.trackOnTime, 1) + " s", theme::kText);
-        tile(3, 0, "TRACKING %", Fmt(std::max(0.0, s.TrackingPct()) * 100.0, 1) + "%", theme::kText);
-    } else {
-        tile(2, 0, "HITS", std::to_string(s.hits), theme::kGood);
-        tile(3, 0, s.expired > 0 ? TextFormat("MISSES  (+%d EXPIRED)", s.expired) : "MISSES", std::to_string(s.Misses()),
-             theme::kWarn);
-    }
-    tile(0, 1, "AVG REACTION", MsOrDash(s.AvgReactionMs()), theme::kText);
-    tile(1, 1, "AVG TIME TO KILL", MsOrDash(s.AvgTtkMs()), theme::kText);
-    const double share = s.OvershootShare();
-    tile(2, 1, TextFormat("OVER / UNDER  (%d / %d)", s.overshoots, s.undershoots),
-         share >= 0.0 ? (share >= 0.5 ? Fmt(share * 100.0, 0) + "% OVER" : Fmt((1.0 - share) * 100.0, 0) + "% UNDER") : "-",
-         theme::kText);
-    if (s.mode == ModeId::Placement) {
-        tile(2, 1, "HEAD LEVEL", s.HeadLevelPct() >= 0.0 ? Fmt(s.HeadLevelPct() * 100.0, 0) + "%" : "-", theme::kText);
-        const double v = s.MeanPlacementVert();
-        tile(3, 1, v < -0.8 ? "AVG PLACEMENT (TOO LOW)" : (v > 0.8 ? "AVG PLACEMENT (TOO HIGH)" : "AVG PLACEMENT ERROR"),
-             s.MeanPlacementErr() >= 0.0 ? Fmt(s.MeanPlacementErr(), 2) + " deg" : "-", theme::kText);
-    } else {
-        tile(3, 1, "AVG CLICK ERROR", s.MeanErrDeg() >= 0.0 ? Fmt(s.MeanErrDeg(), 2) + " deg" : "-", theme::kText);
+    if (s.mode != ModeId::VsBot && s.mode != ModeId::Sniper) {
+        tile(0, 0, scoreTitle, std::to_string(shown), theme::kAccent);
+        tile(1, 0, s.mode == ModeId::Tracking ? "ACCURACY (ON TARGET WHILE FIRING)" : "ACCURACY", Fmt(s.Accuracy() * 100.0, 1) + "%",
+             theme::kAccent);
+        if (s.mode == ModeId::Tracking) {
+            tile(2, 0, "TIME ON TARGET", Fmt(s.trackOnTime, 1) + " s", theme::kText);
+            tile(3, 0, "TRACKING %", Fmt(std::max(0.0, s.TrackingPct()) * 100.0, 1) + "%", theme::kText);
+        } else {
+            tile(2, 0, "HITS", std::to_string(s.hits), theme::kGood);
+            tile(3, 0, s.expired > 0 ? TextFormat("MISSES  (+%d EXPIRED)", s.expired) : "MISSES", std::to_string(s.Misses()),
+                 theme::kWarn);
+        }
+        tile(0, 1, "AVG REACTION", MsOrDash(s.AvgReactionMs()), theme::kText);
+        tile(1, 1, "AVG TIME TO KILL", MsOrDash(s.AvgTtkMs()), theme::kText);
+        if (s.mode == ModeId::Placement) {
+            tile(2, 1, "HEAD LEVEL", s.HeadLevelPct() >= 0.0 ? Fmt(s.HeadLevelPct() * 100.0, 0) + "%" : "-", theme::kText);
+            const double v = s.MeanPlacementVert();
+            tile(3, 1, v < -0.8 ? "AVG PLACEMENT (TOO LOW)" : (v > 0.8 ? "AVG PLACEMENT (TOO HIGH)" : "AVG PLACEMENT ERROR"),
+                 s.MeanPlacementErr() >= 0.0 ? Fmt(s.MeanPlacementErr(), 2) + " deg" : "-", theme::kText);
+        } else {
+            const double share = s.OvershootShare();
+            tile(2, 1, TextFormat("OVER / UNDER  (%d / %d)", s.overshoots, s.undershoots),
+                 share >= 0.0 ? (share >= 0.5 ? Fmt(share * 100.0, 0) + "% OVER" : Fmt((1.0 - share) * 100.0, 0) + "% UNDER") : "-",
+                 theme::kText);
+            tile(3, 1, "AVG CLICK ERROR", s.MeanErrDeg() >= 0.0 ? Fmt(s.MeanErrDeg(), 2) + " deg" : "-", theme::kText);
+        }
     }
     if (s.mode == ModeId::VsBot) {
         // Match summary replaces the aim-mode tiles.
@@ -410,6 +409,18 @@ void App::ScreenResults() {
         tile(2, 1, "SHOTS WHILE MOVING", s.shots > 0 ? Fmt(100.0 * s.movingShots / s.shots, 0) + "%" : "-",
              s.shots > 0 && s.movingShots * 4 > s.shots ? theme::kAccent : theme::kText);
         tile(3, 1, "DAMAGE DEALT / TAKEN", TextFormat("%.0f / %.0f", s.damageDealt, s.damageTaken), theme::kText);
+    }
+
+    if (s.mode == ModeId::Sniper) {
+        tile(0, 0, scoreTitle, std::to_string(shown), theme::kAccent);
+        tile(1, 0, "ACCURACY", Fmt(s.Accuracy() * 100.0, 1) + "%", theme::kAccent);
+        tile(0, 1, "AVG REACTION (SEEN -> SHOT)", MsOrDash(s.AvgReactionMs()), theme::kText);
+        tile(1, 1, "AVG TIME TO KILL", MsOrDash(s.AvgTtkMs()), theme::kText);
+        tile(2, 0, "KILLS / PEEKS", TextFormat("%d / %d", s.kills, s.peeks), theme::kGood);
+        tile(3, 0, "DEATHS", std::to_string(s.deaths), s.deaths > 0 ? theme::kAccent : theme::kText);
+        tile(2, 1, "SHOTS WHILE MOVING", s.shots > 0 ? Fmt(100.0 * s.movingShots / s.shots, 0) + "%" : "-",
+             s.movingShots > 0 ? theme::kAccent : theme::kText);
+        tile(3, 1, "HEADSHOT %", s.hits > 0 ? Fmt(100.0 * s.headshots / s.hits, 0) + "%" : "-", theme::kText);
     }
 
     // Coaching tips.
@@ -456,7 +467,8 @@ void App::ScreenResults() {
                  rr.y + 72.0f, 20.0f, TierColor(lastRunRank_.tier));
         } else {
             Text(s.duration < kMinRankedSeconds ? "Runs shorter than 20 s are not ranked."
-                                                : "Not enough hits in this run to estimate a rank.",
+                                                : (s.mode == ModeId::Sniper ? "Not enough peeks in this run to estimate a rank (5 needed)."
+                                                                             : "Not enough hits in this run to estimate a rank."),
                  rr.x + 24.0f, rr.y + 40.0f, 20.0f, theme::kTextDim);
         }
     }
@@ -1242,6 +1254,16 @@ void App::ScreenDifficulty() {
                                                          "The standard. Valorant-sized hitboxes.",
                                                          "Smaller, faster, less time. For consistent players.",
                                                          "Tiny targets and brutal windows. Good luck."};
+    static const char* const sniperBlurbs[kDifficultyCount] = {
+        "Static peeks from the left or right of the big wall, one at a time. Enemies don't shoot back.",
+        "Swings and crouch peeks from all four spots. Enemies shoot back when they see you.",
+        "Wide swings, jump peeks, jiggle baits, and enemies holding angles you have to peek.",
+        "Everything, with short peeks and fast, accurate enemies. Peek like it matters."};
+    static const char* const sniperLines[kDifficultyCount][3] = {
+        {"Peeks   static", "Spots   2 (big wall)", "Return fire   no"},
+        {"Peeks   swing, crouch", "Spots   4", "Enemy react   ~650 ms"},
+        {"Peeks   + wide, jump, jiggle", "Holds + enemy Ops (40%)", "Enemy react   ~420 ms"},
+        {"Peeks   all, 0.7 s out", "Holds + enemy Ops (60%)", "Enemy react   ~300 ms"}};
     const float gap = 20.0f;
     const float cw = (kContentWidth - 3.0f * gap) / 4.0f;
     int picked = -1;
@@ -1256,11 +1278,17 @@ void App::ScreenDifficulty() {
         if (last) Border(r, 2.0f, Alpha(accents[i], 0.7f));
         Text(TextFormat("%d", i + 1), r.x + r.width - 24.0f, r.y + 20.0f, 20.0f, Alpha(theme::kTextDim, 0.6f), Align::Right);
         TextBold(DifficultyName(d), r.x + 26.0f, r.y + 28.0f, 40.0f, accents[i]);
-        TextBlock(blurbs[i], r.x + 26.0f, r.y + 86.0f, r.width - 52.0f, 18.0f, theme::kTextDim);
+        const bool sniper = pickMode_ == ModeId::Sniper;
+        TextBlock(sniper ? sniperBlurbs[i] : blurbs[i], r.x + 26.0f, r.y + 86.0f, r.width - 52.0f, 18.0f, theme::kTextDim);
         const float ly = r.y + 170.0f;
-        Text(TextFormat("Target size   %.0f%%", p.size * 100.0), r.x + 26.0f, ly, 20.0f, theme::kText);
-        Text(TextFormat("Time window   %.0f%%", p.time * 100.0), r.x + 26.0f, ly + 34.0f, 20.0f, theme::kText);
-        Text(TextFormat("Target speed  %.0f%%", p.speed * 100.0), r.x + 26.0f, ly + 68.0f, 20.0f, theme::kText);
+        if (sniper) {
+            // Enemy behaviour instead of target size (hitboxes are always real size here).
+            for (int l = 0; l < 3; ++l) Text(sniperLines[i][l], r.x + 26.0f, ly + 34.0f * static_cast<float>(l), 20.0f, theme::kText);
+        } else {
+            Text(TextFormat("Target size   %.0f%%", p.size * 100.0), r.x + 26.0f, ly, 20.0f, theme::kText);
+            Text(TextFormat("Time window   %.0f%%", p.time * 100.0), r.x + 26.0f, ly + 34.0f, 20.0f, theme::kText);
+            Text(TextFormat("Target speed  %.0f%%", p.speed * 100.0), r.x + 26.0f, ly + 68.0f, 20.0f, theme::kText);
+        }
         Text(TextFormat("Rank value    x%.2f", p.rankMult), r.x + 26.0f, ly + 110.0f, 20.0f, accents[i]);
         long long best = 0;
         if (stats_.BestScore(pickMode_, d, best)) {

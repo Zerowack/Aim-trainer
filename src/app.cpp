@@ -242,7 +242,12 @@ void App::Frame() {
 
     // 7) Optional frame cap (precise sleep + spin, no vsync).
     int cap = cfg_.FpsCap();
-    if (screen_ != Screen::Playing && (cap == 0 || cap > kMenuFpsLimit)) cap = kMenuFpsLimit;
+    if (screen_ != Screen::Playing) {
+        // Menus: at least the monitor's refresh rate so they never feel
+        // slower than the game, but not thousands of FPS for nothing.
+        const int menuCap = std::max(kMenuFpsLimit, GetMonitorRefreshRate(GetCurrentMonitor()) + 10);
+        if (cap == 0 || cap > menuCap) cap = menuCap;
+    }
     if (IsWindowMinimized()) cap = 30;
     if (cap > 0) {
         const double period = 1.0 / cap;
@@ -325,7 +330,6 @@ void App::EndRun() {
     lastRunRanked_ = RankFromRecord(record, lastRunRank_);
     lastModeRanked_ = ModeRank(stats_, s.mode, lastModeRank_);
     lastStats_ = s;
-    resultsShownAt_ = platform::Now();
     lastTips_ = BuildTips(s, cfg_.sens);
 
     // Optional: let the coach apply its over/undershoot sens suggestion.

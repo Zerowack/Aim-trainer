@@ -14,8 +14,9 @@ Valorant:
 - **Timing:** FPS is uncapped by default with V-Sync off. You can set an optional cap (144/240/360, or any custom value from 30 to 2000),
   and an FPS counter shows frame time. All timing uses `QueryPerformanceCounter`.
 - **Eight training modes:** Gridshot, Microshot, Tracking (ADAD strafes), Flick 180, Reaction, Peek Practice,
-  Crosshair Placement and Sniper (Marshal / Outlaw / Operator), each with Easy / Normal / Hard / Insane
-  difficulty. The **scoped sensitivity multiplier** works like Valorant's.
+  Crosshair Placement and Sniper, each with Easy / Normal / Hard / Insane difficulty. Sniper is an
+  angle-holding scenario (Marshal / Outlaw / Operator) where enemies swing, jump, crouch and jiggle peek and you move and
+  shoot like in Valorant. The **scoped sensitivity multiplier** works like Valorant's.
 - **VS Bot:** a 1v1 duel in a box arena against a bot from Iron to Radiant. You move like in
   Valorant: run, walk, crouch, jump, counter-strafe, with movement inaccuracy and a rifle spray.
 - **Sens Finder:** uses the Perfect Sensitivity Approximation (PSA) method. It runs 7 rounds of blind A/B
@@ -196,12 +197,35 @@ mode, use **MINIMIZE** on the main menu or in the pause menu, or press Alt-Tab o
    You're scored on where your crosshair **already was** when an agent appeared (the angle to its
    head), plus how much of the time you keep it at head level. In Valorant that's your eye line.
    The coach tells you if you hold your crosshair too low or too high.
-8. **Sniper**: pick a **Marshal**, **Outlaw** or **Operator**, then a difficulty. Agents appear at
-   20–36 m around the range. Right mouse scopes (Operator: 2.5× → 5× → unscoped). Scoped shots are
-   exact; unscoped shots get the rifle's hipfire spread (Operator 5°!), plus a no-scope bonus if they
-   land. Each rifle has its own fire rate, magazine and reload, based on Valorant's. Agents only
-   appear once your rifle is ready, so every rifle can reach the same rank. Choose toggle or hold
-   to scope, and rebind Scope, in Settings → Keybinds.
+8. **Sniper**: hold (and retake) a long angle, like C long on Haven. Pick a **Marshal**, **Outlaw** or
+   **Operator**, then a difficulty. The lane ends in a big wall with a box on each side in front of it;
+   enemies peek from behind them one at a time, from a random side, so you have to flick between the
+   angles. You have your own cover (two tall boxes and a low one) and **move like in Valorant**
+   (WASD, Shift walk, Ctrl crouch, Space jump; you can't cross the red line in the middle).
+   - **Movement accuracy:** scoped and standing still, shots are exact. Moving adds up to 3° (Marshal),
+     4° (Outlaw) or 6° (Operator) of spread at full speed, and jumping adds 10°. Unscoped shots also
+     get the hipfire spread (Operator 5°). The hint under the crosshair says ACCURATE or MOVING. So:
+     peek, stop (counter-strafe), then shoot. Scoped you move at about 3/4 speed.
+   - **Damage (150 HP enemies):** Operator 255 head / 150 body / 127 legs (a body shot kills), Outlaw
+     238 / 140 / 119, Marshal 202 / 101 / 85 (body shots need a follow-up). A hit enemy that survives
+     falls back behind cover.
+   - **Difficulty:**
+     - **Easy:** static peeks from the left or right side of the big wall, one at a time. Enemies walk
+       out, stand still and don't shoot.
+     - **Normal:** swings and crouch peeks from all four spots. Enemies shoot back (rifle taps,
+       ~650 ms reaction).
+     - **Hard:** wide swings, jump peeks, jiggle baits (don't waste your shot on them), and enemies
+       **holding an angle** that you have to peek yourself (retakes). 40% of enemies carry an Operator.
+       ~420 ms reaction.
+     - **Insane:** all of it, with short peeks (0.7 s), ~300 ms reactions and 60% Operators.
+   - On Hard and Insane you respawn behind cover, so you choose how to peek. A wide, fast swing is harder
+     for a holding enemy to react to and hit, but you can't shoot accurately until you stop.
+   - Each rifle has its own fire rate, magazine and reload. Reloading drops the scope. Enemies only
+     appear once your rifle is ready, so every rifle can reach the same rank. Choose toggle or hold to
+     scope, and rebind Scope, in Settings → Keybinds. The results show kills / peeks, deaths, headshot %
+     and how many shots you fired while moving.
+   - The sniper rank is the share of peeks you killed (deaths count against you) × accuracy × speed
+     (time to kill after the enemy showed up). Sniper runs from before v1.9 are not ranked.
 
 9. **VS Bot**: a skirmish-style 1v1 against a bot in an arena full of boxes. Tall boxes are full
    cover; low boxes let you crouch behind them with your head still showing. First pick the bot's
@@ -317,7 +341,9 @@ Copy the new value into Valorant to keep both games the same. Everything is appe
 | `src/targets.h`, `src/targets.cpp` | hitbox sizes, ray hit tests, target drawing |
 | `src/world.h`, `src/world.cpp` | shooting range, lighting shader, cover boxes and arena walls |
 | `src/modes.h`, `src/modes.cpp` | the training modes and the mixed Sens Finder test |
-| `src/vsbot.cpp` | VS Bot: Valorant-style movement, rifle, arena and bot AI per rank |
+| `src/vsbot.cpp` | VS Bot: rifle, arena and bot AI per rank |
+| `src/sniper.cpp` | Sniper: the angle-holding lane, peek types, enemy return fire |
+| `src/movement.h`, `src/movement.cpp` | Valorant-style movement shared by VS Bot and Sniper (run, walk, crouch, jump, counter-strafe) |
 | `src/sens_finder.h`, `src/sens_finder.cpp` | PSA logic, scoring, session storage and averaging |
 | `src/stats.h`, `src/stats.cpp` | run statistics, coaching tips, `stats.csv` |
 | `src/rank.h`, `src/rank.cpp` | estimated aim rank (tier thresholds per mode), roasts |

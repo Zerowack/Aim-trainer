@@ -75,6 +75,8 @@ add_executable(Valtrainer WIN32
     src/modes.cpp
     src/modes.h
     src/vsbot.cpp
+    src/movement.cpp
+    src/sniper.cpp
     src/platform.h
     src/platform_win32.cpp
     src/rank.cpp
