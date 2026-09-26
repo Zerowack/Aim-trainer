@@ -112,16 +112,24 @@ void App::ApplyDisplayMode() {
     switch (cfg_.displayMode) {
         case DisplayMode::Fullscreen:
             // Exclusive fullscreen at the monitor's native resolution.
+            ClearWindowState(FLAG_WINDOW_UNDECORATED);
             SetWindowSize(mw, mh);
             ToggleFullscreen();
             break;
         case DisplayMode::Borderless:
-            ToggleBorderlessWindowed();
-            // raylib makes borderless windows "always on top", which stops
-            // Alt-Tab / the Windows key from showing other programs.
+            // Our own borderless window instead of raylib's: a window exactly
+            // the size of the monitor makes GPU drivers treat the OpenGL window
+            // like exclusive fullscreen (frames skip the desktop compositor), so
+            // Discord / OBS capture froze on the last menu frame. One extra
+            // pixel above and below (off-screen) prevents that, and keeps the
+            // screen centre - and the crosshair - on the exact same pixel.
+            SetWindowState(FLAG_WINDOW_UNDECORATED);
             ClearWindowState(FLAG_WINDOW_TOPMOST);
+            SetWindowSize(mw, mh + 2);
+            SetWindowPosition(static_cast<int>(mpos.x), static_cast<int>(mpos.y) - 1);
             break;
         case DisplayMode::Windowed: {
+            ClearWindowState(FLAG_WINDOW_UNDECORATED);
             const int w = std::min(cfg_.windowWidth, mw - 80);
             const int h = std::min(cfg_.windowHeight, mh - 120);
             SetWindowSize(w, h);

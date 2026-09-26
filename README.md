@@ -294,7 +294,11 @@ Enter opens the first match.
 into Discord) and saved as a PNG in the `Screenshots` folder next to the exe, without freezing the game.
 
 **Streaming (Discord / OBS):** use **Borderless** display mode (the default). Exclusive fullscreen can't be
-captured by window capture, so viewers only see a frozen frame.
+captured by window capture, so viewers only see a frozen frame. Valtrainer's borderless window is one pixel
+taller than the screen on both edges (off-screen): a window that exactly covers the monitor makes GPU drivers
+treat OpenGL like exclusive fullscreen, which also froze the stream on the last menu frame. If a stream still
+freezes, share the whole screen instead of the window, or switch off Windows 11's "Optimizations for windowed
+games" (Settings > System > Display > Graphics) for Valtrainer.
 
 **Scoped sensitivity:** Settings → Sensitivity → *Scoped sensitivity multiplier* is the same
 setting as Valorant's (Settings → General → Mouse). While scoped, each mouse count turns
