@@ -26,6 +26,8 @@ struct GameContext {
     Effects* fx = nullptr;  // optional cosmetic effects
     Color targetColor = Color{80, 220, 255, 255};
     float brightness = 1.0f;  // map brightness (targets are never dimmed)
+    Difficulty difficulty = Difficulty::Normal;
+    DifficultyParams diff = GetDifficulty(Difficulty::Normal);
 };
 
 // ADAD strafing movement shared by Tracking and the sens finder test.
@@ -46,6 +48,7 @@ struct Strafer {
     double timer = 0.0;
     float minX = -4.5f;
     float maxX = 4.5f;
+    float speedScale = 1.0f;  // difficulty
 
     void Reset(Rng& rng);
     void Update(double dt, Rng& rng);

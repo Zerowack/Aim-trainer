@@ -4,11 +4,29 @@
 #include <string>
 #include <vector>
 
-enum class ModeId : int { Gridshot = 0, Microshot, Tracking, Flick180, Reaction, Peek, Mixed, Count };
+enum class ModeId : int { Gridshot = 0, Microshot, Tracking, Flick180, Reaction, Peek, Placement, Mixed, Count };
 
-constexpr int kPlayableModeCount = 6;  // everything except Mixed (sens finder only)
+constexpr int kPlayableModeCount = 7;  // everything except Mixed (sens finder only)
+
+// Difficulty picked before each run. It scales target size, time windows,
+// movement speed and distance, and the rank value (harder = worth more).
+enum class Difficulty : int { Easy = 0, Normal, Hard, Insane, Count };
+constexpr int kDifficultyCount = 4;
+
+struct DifficultyParams {
+    float size;       // target size multiplier (humanoids: 1/size distance)
+    float time;       // lifetime / exposure window multiplier
+    float speed;      // movement speed multiplier
+    double rankMult;  // rank value multiplier
+};
+
+DifficultyParams GetDifficulty(Difficulty d);
+const char* DifficultyName(Difficulty d);  // "Hard"
+const char* DifficultyKey(Difficulty d);   // "hard" (CSV)
+bool DifficultyFromKey(const std::string& key, Difficulty& out);
 
 const char* ModeName(ModeId m);         // "Gridshot"
+const char* ModeShortName(ModeId m);    // short label for tabs ("Placement")
 const char* ModeKey(ModeId m);          // "gridshot" (used in the CSV file)
 const char* ModeDescription(ModeId m);
 bool ModeFromKey(const std::string& key, ModeId& out);
@@ -16,6 +34,7 @@ bool ModeFromKey(const std::string& key, ModeId& out);
 // Raw counters collected during a run. Derived values are computed on demand.
 struct RunStats {
     ModeId mode = ModeId::Gridshot;
+    Difficulty difficulty = Difficulty::Normal;
     double duration = 0.0;  // seconds actually played
 
     long long score = 0;
@@ -44,6 +63,14 @@ struct RunStats {
     double trackHeldTime = 0.0;   // firing
     double trackTotalTime = 0.0;  // time a tracking target existed
 
+    // Crosshair placement: angle from crosshair to the head at the moment
+    // each agent appeared, and time spent with the crosshair at head level.
+    double placementErrSum = 0.0;
+    double placementVertSum = 0.0;  // signed: negative = crosshair below head
+    int placementCount = 0;
+    double headLevelTime = 0.0;
+    double headLevelTotal = 0.0;
+
     int Misses() const { return shots - hits; }
     double Accuracy() const;            // 0..1 (tracking uses on-target / firing time)
     double AvgReactionMs() const;       // < 0 if no data
@@ -53,6 +80,9 @@ struct RunStats {
     double MeanRelError() const;        // signed, + = overshoot
     double MeanErrNorm() const;         // < 0 if no data
     double MeanErrDeg() const;          // < 0 if no data
+    double MeanPlacementErr() const;    // degrees, < 0 if no data
+    double MeanPlacementVert() const;   // degrees, signed
+    double HeadLevelPct() const;        // 0..1, < 0 if no data
 };
 
 // The coach's sensitivity suggestion from over/undershoot data, in percent
@@ -67,6 +97,7 @@ std::vector<std::string> BuildTips(const RunStats& s, double sens);
 struct RunRecord {
     std::string timestamp;
     ModeId mode = ModeId::Gridshot;
+    Difficulty difficulty = Difficulty::Normal;
     double duration = 0.0;
     long long score = 0;
     double accuracy = 0.0;      // percent
@@ -78,6 +109,7 @@ struct RunRecord {
     double trackingPct = -1.0;
     double sens = 0.0;
     double dpi = 0.0;
+    double placementErr = -1.0;  // Crosshair Placement mode, degrees
 };
 
 RunRecord MakeRecord(const RunStats& s, double sens, double dpi);
@@ -94,6 +126,8 @@ public:
     std::vector<const RunRecord*> ForMode(ModeId m) const;
     // Best score for the mode, or false if there are no runs.
     bool BestScore(ModeId m, long long& out) const;
+    // Best score for the mode at one difficulty.
+    bool BestScore(ModeId m, Difficulty d, long long& out) const;
 
 private:
     std::string path_;

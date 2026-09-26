@@ -29,6 +29,8 @@ bool ThresholdsFor(ModeId m, Thresholds& t) {
         case ModeId::Reaction: t = {{320.0, 295.0, 275.0, 258.0, 243.0, 230.0, 218.0, 207.0, 195.0}, true}; return true;
         // Peek: peeks killed per second x accuracy (the peek rate caps this near 0.58).
         case ModeId::Peek: t = {{0.14, 0.20, 0.26, 0.32, 0.37, 0.42, 0.46, 0.50, 0.54}, false}; return true;
+        // Crosshair Placement: average angle to the head when agents appear (deg).
+        case ModeId::Placement: t = {{14.0, 11.0, 8.5, 6.5, 5.0, 3.8, 2.8, 2.0, 1.3}, true}; return true;
         default: return false;
     }
 }
@@ -191,6 +193,10 @@ bool RankFromRecord(const RunRecord& rec, AimRank& out) {
     double value = 0.0;
     const double acc = std::max(0.0, std::min(1.0, rec.accuracy / 100.0));
     switch (rec.mode) {
+        case ModeId::Placement:
+            if (rec.placementErr < 0.0 || rec.hits < 5) return false;
+            value = rec.placementErr;
+            break;
         case ModeId::Tracking:
             if (rec.trackingPct < 0.0) return false;
             value = rec.trackingPct;
@@ -204,6 +210,9 @@ bool RankFromRecord(const RunRecord& rec, AimRank& out) {
             value = static_cast<double>(rec.hits) / rec.duration * acc;
             break;
     }
+    // Difficulty: harder runs are worth more (lower-is-better stats shrink).
+    const double mult = GetDifficulty(rec.difficulty).rankMult;
+    value = t.lowerIsBetter ? value / mult : value * mult;
     out = RankFromPoints(PointsFromValue(value, t));
     return true;
 }

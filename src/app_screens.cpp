@@ -94,6 +94,19 @@ void DrawModeIcon(ModeId m, float cx, float cy, float s, Color c) {
             Fill(Rectangle{cx - s * 0.02f, cy - s * 0.07f, s * 0.2f, s * 0.5f}, c);
             Fill(Rectangle{cx - s * 0.5f, cy - s * 0.35f, s * 0.46f, s * 0.8f}, Alpha(c, 0.35f));
             break;
+        case ModeId::Placement:
+            // Pillar, head-level line and a crosshair resting on it.
+            Fill(Rectangle{cx + s * 0.2f, cy - s * 0.45f, s * 0.2f, s * 0.9f}, Alpha(c, 0.35f));
+            for (int i = 0; i < 5; ++i) {
+                const float x = cx - s * 0.5f + static_cast<float>(i) * s * 0.2f;
+                Line(Vector2{x, cy}, Vector2{x + s * 0.1f, cy}, 2.0f, Alpha(c, 0.6f));
+            }
+            Circle(Vector2{cx + s * 0.5f, cy}, s * 0.09f, c);
+            Line(Vector2{cx - s * 0.2f, cy - s * 0.22f}, Vector2{cx - s * 0.2f, cy - s * 0.08f}, t, c);
+            Line(Vector2{cx - s * 0.2f, cy + s * 0.08f}, Vector2{cx - s * 0.2f, cy + s * 0.22f}, t, c);
+            Line(Vector2{cx - s * 0.34f, cy}, Vector2{cx - s * 0.28f, cy}, t, c);
+            Line(Vector2{cx - s * 0.12f, cy}, Vector2{cx - s * 0.06f, cy}, t, c);
+            break;
         default:
             break;
     }
@@ -107,10 +120,10 @@ bool Card(Rectangle r, ModeId mode, const std::string& title, const std::string&
     // Accent edge grows on hover.
     Fill(Rectangle{r.x, r.y, 5.0f + 3.0f * a, r.height - 16.0f}, Lerp2(theme::kAccentDim, theme::kAccent, a));
     Text(TextFormat("%02d", index), r.x + r.width - 24.0f, r.y + 16.0f, 20.0f, Alpha(theme::kTextDim, 0.5f), Align::Right);
-    TextBold(title, r.x + 26.0f, r.y + 16.0f, 30.0f, theme::kText);
-    TextBlock(desc, r.x + 26.0f, r.y + 58.0f, r.width - 150.0f, 18.0f, theme::kTextDim);
-    Text(footer, r.x + 26.0f + 6.0f * a, r.y + r.height - 34.0f, 18.0f, Lerp2(theme::kText, theme::kAccent, a));
-    DrawModeIcon(mode, r.x + r.width - 68.0f, r.y + r.height * 0.55f, 70.0f, Lerp2(theme::kTextDim, theme::kText, a));
+    TextBold(title, r.x + 26.0f, r.y + 12.0f, 27.0f, theme::kText);
+    TextBlock(desc, r.x + 26.0f, r.y + 48.0f, r.width - 140.0f, 17.0f, theme::kTextDim);
+    Text(footer, r.x + 26.0f + 6.0f * a, r.y + r.height - 30.0f, 17.0f, Lerp2(theme::kText, theme::kAccent, a));
+    DrawModeIcon(mode, r.x + r.width - 62.0f, r.y + r.height * 0.56f, 60.0f, Lerp2(theme::kTextDim, theme::kText, a));
     return hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
@@ -196,25 +209,27 @@ void App::ScreenMainMenu() {
          theme::kTextDim);
     Text(TextFormat("v%s", kAppVersion), x0 + kContentWidth, VH() - 40.0f, 18.0f, Alpha(theme::kTextDim, 0.7f), Align::Right);
 
-    // Mode cards: 2 columns x 3 rows.
-    const float cw = 470.0f, ch = 170.0f, gap = 18.0f;
+    // Mode cards: 2 columns x 4 rows.
+    const float cw = 470.0f, ch = 130.0f, gap = 14.0f;
     for (int i = 0; i < kPlayableModeCount; ++i) {
         const ModeId m = static_cast<ModeId>(i);
         const float cx = x0 + static_cast<float>(i % 2) * (cw + gap);
         const float cy = 200.0f + static_cast<float>(i / 2) * (ch + gap);
         long long best = 0;
-        std::string footer = stats_.BestScore(m, best) ? "BEST " + std::to_string(best) + "   " : "";
+        std::string footer = stats_.BestScore(m, currentDifficulty_, best)
+                                 ? "BEST " + std::to_string(best) + " (" + DifficultyName(currentDifficulty_) + ")   "
+                                 : "";
         AimRank mr;
         if (ModeRank(stats_, m, mr)) footer += RankLabel(mr) + "   ";
         footer += ">  PLAY";
         if (Card(Rectangle{cx, cy, cw, ch}, m, ModeName(m), ModeDescription(m), footer, i + 1)) {
-            StartRun(m, false);
+            ChooseDifficulty(m);
             return;
         }
     }
     Text(TextFormat("Runs last %d s (change in Settings > Gameplay)  |  Esc pause  |  %s restart  |  %s FPS counter",
                     cfg_.runSeconds, input::BindName(cfg_.keys.restart).c_str(), input::BindName(cfg_.keys.toggleFps).c_str()),
-         x0, 200.0f + 3.0f * (ch + gap) + 6.0f, 18.0f, theme::kTextDim);
+         x0, 200.0f + 4.0f * (ch + gap) + 6.0f, 18.0f, theme::kTextDim);
 
     // Right column.
     const float rx = x0 + 2.0f * (cw + gap) + 40.0f;
@@ -293,7 +308,7 @@ void App::ScreenMainMenu() {
 void App::ScreenResults() {
     const float x0 = ContentX();
     const RunStats& s = lastStats_;
-    Title(std::string(ModeName(s.mode)) + "  -  RESULTS", x0, 60.0f, 52.0f);
+    Title(std::string(ModeName(s.mode)) + " (" + DifficultyName(s.difficulty) + ")  -  RESULTS", x0, 60.0f, 52.0f);
     if (lastWasPb_) {
         Angled(Rectangle{x0 + 6.0f, 136.0f, 330.0f, 40.0f}, theme::kAccent, 10.0f);
         Text(hadPreviousBest_ ? "NEW PERSONAL BEST" : "FIRST RUN - PB SET", x0 + 171.0f, 144.0f, 22.0f, theme::kText,
@@ -333,7 +348,14 @@ void App::ScreenResults() {
     tile(2, 1, TextFormat("OVER / UNDER  (%d / %d)", s.overshoots, s.undershoots),
          share >= 0.0 ? (share >= 0.5 ? Fmt(share * 100.0, 0) + "% OVER" : Fmt((1.0 - share) * 100.0, 0) + "% UNDER") : "-",
          theme::kText);
-    tile(3, 1, "AVG CLICK ERROR", s.MeanErrDeg() >= 0.0 ? Fmt(s.MeanErrDeg(), 2) + " deg" : "-", theme::kText);
+    if (s.mode == ModeId::Placement) {
+        tile(2, 1, "HEAD LEVEL", s.HeadLevelPct() >= 0.0 ? Fmt(s.HeadLevelPct() * 100.0, 0) + "%" : "-", theme::kText);
+        const double v = s.MeanPlacementVert();
+        tile(3, 1, v < -0.8 ? "AVG PLACEMENT (TOO LOW)" : (v > 0.8 ? "AVG PLACEMENT (TOO HIGH)" : "AVG PLACEMENT ERROR"),
+             s.MeanPlacementErr() >= 0.0 ? Fmt(s.MeanPlacementErr(), 2) + " deg" : "-", theme::kText);
+    } else {
+        tile(3, 1, "AVG CLICK ERROR", s.MeanErrDeg() >= 0.0 ? Fmt(s.MeanErrDeg(), 2) + " deg" : "-", theme::kText);
+    }
 
     // Coaching tips.
     // Rank strip: this run's rank, progress, mode rank and a comment.
@@ -725,7 +747,7 @@ void App::ScreenStats() {
     Title("STATS & PROGRESS", x0, 50.0f, 52.0f);
     const float tabW = kContentWidth / static_cast<float>(kPlayableModeCount);
     for (int i = 0; i < kPlayableModeCount; ++i) {
-        if (Tab(Rectangle{x0 + static_cast<float>(i) * tabW, 130.0f, tabW, 52.0f}, ModeName(static_cast<ModeId>(i)),
+        if (Tab(Rectangle{x0 + static_cast<float>(i) * tabW, 130.0f, tabW, 52.0f}, ModeShortName(static_cast<ModeId>(i)),
                 statsMode_ == i)) {
             statsMode_ = i;
         }
@@ -785,9 +807,9 @@ void App::ScreenStats() {
     float ry = 700.0f;
     Text("RECENT RUNS", x0, ry, 20.0f, theme::kAccent);
     ry += 32.0f;
-    const float cols[] = {0.0f, 260.0f, 420.0f, 580.0f, 760.0f, 940.0f, 1120.0f};
-    const char* const heads[] = {"DATE", "SCORE", "ACCURACY", "REACTION", "TTK", "OVERSHOOT", "SENS"};
-    for (int i = 0; i < 7; ++i) Text(heads[i], x0 + cols[i], ry, 16.0f, theme::kTextDim);
+    const float cols[] = {0.0f, 240.0f, 380.0f, 520.0f, 680.0f, 840.0f, 1000.0f, 1180.0f};
+    const char* const heads[] = {"DATE", "SCORE", "ACCURACY", "REACTION", "TTK", "OVERSHOOT", "SENS", "DIFFICULTY"};
+    for (int i = 0; i < 8; ++i) Text(heads[i], x0 + cols[i], ry, 16.0f, theme::kTextDim);
     ry += 26.0f;
     int shown = 0;
     for (auto it = runs.rbegin(); it != runs.rend() && shown < 6; ++it, ++shown) {
@@ -800,6 +822,7 @@ void App::ScreenStats() {
         Text(MsOrDash(r.avgTtkMs), x0 + cols[4], ry, 18.0f, c);
         Text(r.overshootPct >= 0.0 ? Fmt(r.overshootPct, 0) + "%" : "-", x0 + cols[5], ry, 18.0f, c);
         Text(TextFormat("%.3f @ %.0f", r.sens, r.dpi), x0 + cols[6], ry, 18.0f, c);
+        Text(DifficultyName(r.difficulty), x0 + cols[7], ry, 18.0f, c);
         ry += 28.0f;
     }
     if (runs.empty()) Text("Play this mode to start tracking progress.", x0, ry, 20.0f, theme::kTextDim);
@@ -808,11 +831,11 @@ void App::ScreenStats() {
         screen_ = Screen::MainMenu;
         return;
     }
-    if (Button(Rectangle{x0 + 280.0f, VH() - 100.0f, 300.0f, 60.0f}, TextFormat("PLAY %s", ModeName(m)))) {
-        StartRun(m, false);
+    if (Button(Rectangle{x0 + 280.0f, VH() - 100.0f, 360.0f, 60.0f}, TextFormat("PLAY %s", ModeName(m)))) {
+        ChooseDifficulty(m);
         return;
     }
-    Text("All runs are stored in stats.csv next to the .exe.", x0 + 610.0f, VH() - 80.0f, 18.0f, theme::kTextDim);
+    Text("All runs are stored in stats.csv next to the .exe.", x0 + 670.0f, VH() - 80.0f, 18.0f, theme::kTextDim);
 }
 
 // ===========================================================================
@@ -1060,21 +1083,21 @@ void App::ScreenRank() {
     const float mx = x0 + 660.0f, mw = kContentWidth - 660.0f;
     for (int i = 0; i < kPlayableModeCount; ++i) {
         const ModeId m = static_cast<ModeId>(i);
-        const Rectangle row = {mx, 160.0f + static_cast<float>(i) * 90.0f, mw, 80.0f};
+        const Rectangle row = {mx, 160.0f + static_cast<float>(i) * 78.0f, mw, 70.0f};
         Angled(row, theme::kPanel, 12.0f);
         AimRank mr;
         int ranked = 0;
         const bool has = ModeRank(stats_, m, mr, &ranked);
         if (has) {
-            DrawRankBadge(row.x + 46.0f, row.y + 34.0f, 54.0f, mr);
+            DrawRankBadge(row.x + 42.0f, row.y + 30.0f, 46.0f, mr);
         } else {
-            DrawRankBadge(row.x + 46.0f, row.y + 34.0f, 54.0f, AimRank{}, 0.2f, false);
+            DrawRankBadge(row.x + 42.0f, row.y + 30.0f, 46.0f, AimRank{}, 0.2f, false);
         }
-        TextBold(ModeName(m), row.x + 92.0f, row.y + 14.0f, 24.0f, theme::kText);
-        Text(has ? TextFormat("%d ranked runs", ranked) : "Not ranked yet - play a 20 s+ run", row.x + 92.0f, row.y + 46.0f,
+        TextBold(ModeName(m), row.x + 84.0f, row.y + 10.0f, 22.0f, theme::kText);
+        Text(has ? TextFormat("%d ranked runs", ranked) : "Not ranked yet - play a 20 s+ run", row.x + 84.0f, row.y + 40.0f,
              16.0f, theme::kTextDim);
         if (has) {
-            RankText(mr, row.x + row.width - 24.0f, row.y + 24.0f, 30.0f, Align::Right);
+            RankText(mr, row.x + row.width - 24.0f, row.y + 20.0f, 28.0f, Align::Right);
         }
     }
 
@@ -1097,4 +1120,71 @@ void App::ScreenRank() {
     }
     Text(cfg_.roastMode ? "Roast mode is on (Settings > Gameplay)." : "Roast mode is off (Settings > Gameplay).", x0 + 290.0f,
          VH() - 80.0f, 18.0f, theme::kTextDim);
+}
+
+// ===========================================================================
+// Difficulty picker
+
+void App::ChooseDifficulty(ModeId mode) {
+    pickMode_ = mode;
+    screen_ = Screen::Difficulty;
+}
+
+void App::ScreenDifficulty() {
+    const float x0 = ContentX();
+    Title(ModeName(pickMode_), x0, 50.0f, 52.0f);
+    Text("CHOOSE DIFFICULTY", x0 + 6.0f, 124.0f, 22.0f, theme::kAccent);
+    Text(ModeDescription(pickMode_), x0 + 6.0f, 156.0f, 20.0f, theme::kTextDim);
+
+    static const Color accents[kDifficultyCount] = {{90, 220, 160, 255}, {236, 232, 225, 255}, {255, 196, 80, 255},
+                                                    {255, 75, 87, 255}};
+    static const char* const blurbs[kDifficultyCount] = {"Big targets, lots of time. Warm up or learn the mode.",
+                                                         "The standard. Valorant-sized hitboxes.",
+                                                         "Smaller, faster, less time. For consistent players.",
+                                                         "Tiny targets and brutal windows. Good luck."};
+    const float gap = 20.0f;
+    const float cw = (kContentWidth - 3.0f * gap) / 4.0f;
+    int picked = -1;
+    for (int i = 0; i < kDifficultyCount; ++i) {
+        const ::Difficulty d = static_cast<::Difficulty>(i);
+        const DifficultyParams p = GetDifficulty(d);
+        const Rectangle r = {x0 + static_cast<float>(i) * (cw + gap), 210.0f, cw, 420.0f};
+        const float a = HoverAnim(r);
+        const bool last = d == currentDifficulty_;
+        Angled(r, Lerp2(theme::kPanel, theme::kPanel2, a), 18.0f);
+        Fill(Rectangle{r.x, r.y, r.width - 18.0f, 5.0f + 3.0f * a}, accents[i]);
+        if (last) Border(r, 2.0f, Alpha(accents[i], 0.7f));
+        Text(TextFormat("%d", i + 1), r.x + r.width - 24.0f, r.y + 20.0f, 20.0f, Alpha(theme::kTextDim, 0.6f), Align::Right);
+        TextBold(DifficultyName(d), r.x + 26.0f, r.y + 28.0f, 40.0f, accents[i]);
+        TextBlock(blurbs[i], r.x + 26.0f, r.y + 86.0f, r.width - 52.0f, 18.0f, theme::kTextDim);
+        const float ly = r.y + 170.0f;
+        Text(TextFormat("Target size   %.0f%%", p.size * 100.0), r.x + 26.0f, ly, 20.0f, theme::kText);
+        Text(TextFormat("Time window   %.0f%%", p.time * 100.0), r.x + 26.0f, ly + 34.0f, 20.0f, theme::kText);
+        Text(TextFormat("Target speed  %.0f%%", p.speed * 100.0), r.x + 26.0f, ly + 68.0f, 20.0f, theme::kText);
+        Text(TextFormat("Rank value    x%.2f", p.rankMult), r.x + 26.0f, ly + 110.0f, 20.0f, accents[i]);
+        long long best = 0;
+        if (stats_.BestScore(pickMode_, d, best)) {
+            Text(TextFormat("BEST %lld", best), r.x + 26.0f, r.y + r.height - 44.0f, 18.0f, theme::kTextDim);
+        }
+        if (last) Text("LAST USED", r.x + r.width - 26.0f, r.y + r.height - 44.0f, 16.0f, accents[i], Align::Right);
+        if (Hover(r) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) picked = i;
+        if (IsKeyPressed(KEY_ONE + i) || IsKeyPressed(KEY_KP_1 + i)) picked = i;
+    }
+    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER)) picked = static_cast<int>(currentDifficulty_);
+
+    TextBlock("Harder difficulties count for more towards your aim rank (and Easy for less), so ranks stay fair "
+              "whatever you pick. Personal bests are kept per difficulty.",
+              x0, 660.0f, 900.0f, 18.0f, theme::kTextDim);
+
+    if (picked >= 0) {
+        currentDifficulty_ = static_cast<::Difficulty>(picked);
+        cfg_.difficulty = picked;
+        SaveConfig();
+        StartRun(pickMode_, false);
+        return;
+    }
+    if (Button(Rectangle{x0, VH() - 100.0f, 260.0f, 60.0f}, "BACK") || IsKeyPressed(KEY_ESCAPE)) {
+        screen_ = Screen::MainMenu;
+    }
+    Text("Keys 1-4 pick a difficulty, Enter repeats the last one.", x0 + 290.0f, VH() - 80.0f, 18.0f, theme::kTextDim);
 }

@@ -77,6 +77,7 @@ bool App::Init() {
 #endif
 
     screen_ = cfg_.firstRunDone ? Screen::MainMenu : Screen::FirstRun;
+    currentDifficulty_ = static_cast<::Difficulty>(cfg_.difficulty);
     lastFrameTime_ = platform::Now();
     fpsWindowStart_ = lastFrameTime_;
     return true;
@@ -226,6 +227,7 @@ void App::Frame() {
         case Screen::FinderRound: ui::Backdrop(); ScreenFinderRound(); break;
         case Screen::FinderFinal: ui::Backdrop(); ScreenFinderFinal(); break;
         case Screen::Rank: ui::Backdrop(); ScreenRank(); break;
+        case Screen::Difficulty: ui::Backdrop(); ScreenDifficulty(); break;
     }
     if (screen_ != Screen::Playing) DrawFpsCounter();
 
@@ -273,6 +275,9 @@ void App::StartRun(ModeId id, bool finderTest) {
     ctx.fx = &fx_;
     ctx.targetColor = cfg_.targetColor;
     ctx.brightness = cfg_.mapBrightness;
+    // The sens finder test always runs at Normal so its scores are comparable.
+    ctx.difficulty = finderTest ? ::Difficulty::Normal : currentDifficulty_;
+    ctx.diff = GetDifficulty(ctx.difficulty);
 
     mode_.reset();  // destroy the old mode first (it may own world covers)
     mode_ = CreateMode(id, ctx);
@@ -315,7 +320,7 @@ void App::EndRun() {
         return;
     }
 
-    hadPreviousBest_ = stats_.BestScore(s.mode, previousBest_);
+    hadPreviousBest_ = stats_.BestScore(s.mode, s.difficulty, previousBest_);
     lastWasPb_ = !hadPreviousBest_ || s.score > previousBest_;
     const RunRecord record = MakeRecord(s, cfg_.sens, cfg_.dpi);
     stats_.Append(record);

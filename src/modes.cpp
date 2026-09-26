@@ -42,8 +42,8 @@ void Strafer::Update(double dt, Rng& rng) {
     if (x > maxX - 0.4f && dir > 0) { dir = -1; timer = rng.Uniform(0.25, 0.7); }
     if (x < minX + 0.4f && dir < 0) { dir = 1; timer = rng.Uniform(0.25, 0.7); }
 
-    const double target = dir * kRunSpeed;
-    const double maxStep = kStrafeAccel * dt;
+    const double target = dir * kRunSpeed * speedScale;
+    const double maxStep = kStrafeAccel * speedScale * dt;
     const double delta = Clamp(target - v, -maxStep, maxStep);
     v = static_cast<float>(v + delta);
     x = static_cast<float>(Clamp(x + v * dt, minX, maxX));
@@ -52,7 +52,10 @@ void Strafer::Update(double dt, Rng& rng) {
 // ===========================================================================
 // Mode base
 
-Mode::Mode(ModeId id, const GameContext& ctx) : id_(id), ctx_(ctx) { stats_.mode = id; }
+Mode::Mode(ModeId id, const GameContext& ctx) : id_(id), ctx_(ctx) {
+    stats_.mode = id;
+    stats_.difficulty = ctx.difficulty;
+}
 
 void Mode::OnPresented(double t) {
     for (Target& tg : targets_) {
@@ -325,7 +328,7 @@ private:
         const int col = cell % kCols, row = cell / kCols;
         Target tg;
         tg.kind = TargetKind::Sphere;
-        tg.radius = 0.30f;
+        tg.radius = 0.30f * ctx_.diff.size;
         tg.pos = Vector3{(static_cast<float>(col) - 2.0f) * 1.0f,
                          ValCamera::kEyeHeight + (static_cast<float>(row) - 1.5f) * 0.85f, -10.0f};
         tg.tag = cell;
@@ -363,7 +366,17 @@ public:
         }
     }
 
+    void OnMiss(double /*t*/) override {
+        // One bullet per target: a miss loses it.
+        stats_.score -= 40;
+        ctx_.audio->Play(Sfx::Miss);
+        targets_.clear();
+        Spawn();
+    }
+
     void DrawHud(double t) const override {
+        ui::Text("ONE BULLET PER TARGET", ui::VW() * 0.5f, ui::VH() * 0.5f + 72.0f, 16.0f,
+                 ui::Alpha(ui::theme::kTextDim, 0.7f), ui::Align::Center);
         // Shrinking bar under the crosshair shows the remaining lifetime.
         if (targets_.empty() || !targets_[0].presented) return;
         const Target& tg = targets_[0];
@@ -401,9 +414,9 @@ private:
         lastPitch_ = pitch;
         Target tg;
         tg.kind = TargetKind::Sphere;
-        tg.radius = hitbox::kHeadRadius;
+        tg.radius = hitbox::kHeadRadius * ctx_.diff.size;
         tg.pos = PointFromAngles(yaw, pitch, ctx_.rng->Uniform(10.0, 16.0));
-        tg.lifetime = 1.4;
+        tg.lifetime = 1.4 * ctx_.diff.time;
         targets_.push_back(tg);
     }
 };
@@ -418,9 +431,11 @@ public:
     void Begin(double /*t*/) override {
         targets_.clear();
         strafer_.Reset(*ctx_.rng);
+        strafer_.speedScale = ctx_.diff.speed;
         Target tg;
         tg.kind = TargetKind::Humanoid;
-        tg.pos = Vector3{0.0f, 0.0f, -13.0f};
+        // Harder = further away (smaller on screen) and faster.
+        tg.pos = Vector3{0.0f, 0.0f, -13.0f / ctx_.diff.size};
         targets_.push_back(tg);
     }
 
@@ -491,9 +506,9 @@ private:
         const double offset = ctx_.rng->Uniform(90.0, 180.0) * ctx_.rng->Sign();
         Target tg;
         tg.kind = TargetKind::Sphere;
-        tg.radius = hitbox::kBodySphere;
+        tg.radius = hitbox::kBodySphere * ctx_.diff.size;
         tg.pos = PointFromAngles(ctx_.cam->Yaw() + offset, ctx_.rng->Uniform(-4.0, 12.0), ctx_.rng->Uniform(10.0, 16.0));
-        tg.lifetime = 3.5;
+        tg.lifetime = 3.5 * ctx_.diff.time;
         targets_.push_back(tg);
     }
 };
@@ -517,10 +532,15 @@ public:
                 if (t >= showAt_) {
                     Target tg;
                     tg.kind = TargetKind::Sphere;
-                    tg.radius = 0.55f;
-                    // Appears right under the crosshair: this measures pure reaction.
-                    tg.pos = PointFromAngles(ctx_.cam->Yaw(), ctx_.cam->Pitch(), 8.0);
-                    tg.lifetime = 1.5;
+                    tg.radius = 0.55f * ctx_.diff.size;
+                    // Easy/Normal: right under the crosshair (pure reaction).
+                    // Hard/Insane: slightly off-centre, so a small flick is needed.
+                    double off = 0.0;
+                    if (ctx_.difficulty == Difficulty::Hard) off = 3.0;
+                    if (ctx_.difficulty == Difficulty::Insane) off = 6.0;
+                    const double ang = ctx_.rng->Uniform(0.0, 2.0 * val::kPi);
+                    tg.pos = PointFromAngles(ctx_.cam->Yaw() + std::cos(ang) * off, ctx_.cam->Pitch() + std::sin(ang) * off, 8.0);
+                    tg.lifetime = 1.5 * ctx_.diff.time;
                     targets_.push_back(tg);
                     state_ = State::Showing;
                 }
@@ -640,7 +660,7 @@ public:
                 if (targets_.empty()) break;
                 if (std::fabs(targets_[0].pos.x - exposedX_) < 1e-3f) {
                     phase_ = Phase::Hold;
-                    phaseEnd_ = t + ctx_.rng->Uniform(0.22, 0.55);
+                    phaseEnd_ = t + ctx_.rng->Uniform(0.22, 0.55) * ctx_.diff.time;
                 }
                 break;
             case Phase::Hold:
@@ -723,7 +743,7 @@ private:
     void Move(float toX, double dt) {
         if (targets_.empty()) return;
         float& x = targets_[0].pos.x;
-        const float step = static_cast<float>(kRunSpeed * dt);
+        const float step = static_cast<float>(kRunSpeed * ctx_.diff.speed * dt);
         if (std::fabs(toX - x) <= step) x = toX;
         else x += (toX > x ? step : -step);
     }
@@ -747,6 +767,127 @@ private:
     float exposedX_ = 0.0f;
     bool visible_ = false;
     double visibleTime_ = 0.0;
+};
+
+// ===========================================================================
+// Crosshair Placement: agents appear beside pillars placed around the range.
+// You are scored on where your crosshair already was when an agent appeared
+// (angle to its head), and on how much of the time your crosshair sits at
+// head level - which in Valorant is the eye line (pitch ~0).
+
+class PlacementMode : public Mode {
+public:
+    explicit PlacementMode(const GameContext& ctx) : Mode(ModeId::Placement, ctx) {}
+    ~PlacementMode() override { ctx_.world->ClearCovers(); }
+    PlacementMode(const PlacementMode&) = delete;
+    PlacementMode& operator=(const PlacementMode&) = delete;
+
+    void Begin(double t) override {
+        // Pillars at different angles and distances form the "angles" to hold.
+        const double yaws[kSpots] = {-58.0, -34.0, -14.0, 9.0, 30.0, 55.0};
+        const double dists[kSpots] = {13.0, 20.0, 26.0, 16.0, 23.0, 14.0};
+        std::vector<Box> covers;
+        for (int i = 0; i < kSpots; ++i) {
+            const Vector3 d = DirectionFromAngles(yaws[i], 0.0);
+            spots_[i] = Vector3{d.x * static_cast<float>(dists[i]), 0.0f, d.z * static_cast<float>(dists[i])};
+            spotYaw_[i] = yaws[i];
+            covers.push_back(Box{Vector3{spots_[i].x, 1.5f, spots_[i].z}, Vector3{1.4f, 3.0f, 1.4f}});
+        }
+        ctx_.world->SetCovers(covers);
+        targets_.clear();
+        nextAt_ = t + ctx_.rng->Uniform(0.8, 1.6);
+    }
+
+    void Update(double t, double dt, bool /*triggerHeld*/) override {
+        TickTargets(dt);
+        UpdateReactionOnset(t);
+        // Head level = within 1.5 degrees of the eye line.
+        stats_.headLevelTotal += dt;
+        if (std::fabs(ctx_.cam->Pitch()) < 1.5) stats_.headLevelTime += dt;
+
+        if (targets_.empty()) {
+            if (t >= nextAt_) Spawn();
+        } else if (targets_[0].presented && t - targets_[0].spawnTime > targets_[0].lifetime) {
+            stats_.expired++;
+            stats_.score -= 50;
+            targets_.clear();
+            nextAt_ = t + ctx_.rng->Uniform(0.6, 1.5);
+        }
+    }
+
+    void Draw3D() const override {
+        ctx_.world->DrawCovers();
+        Mode::Draw3D();
+    }
+
+    void DrawHud(double t) const override {
+        const double hl = stats_.HeadLevelPct();
+        ui::Text(TextFormat("HEAD LEVEL %.0f%%", std::max(0.0, hl) * 100.0), ui::VW() * 0.5f, ui::VH() * 0.5f + 190.0f, 22.0f,
+                 ui::Alpha(std::fabs(ctx_.cam->Pitch()) < 1.5 ? ui::theme::kGood : ui::theme::kTextDim, 0.9f), ui::Align::Center);
+        if (t - lastPlacementTime_ < 1.0) {
+            const char* dir = lastPlacementVert_ < -0.8 ? "  (too low)" : (lastPlacementVert_ > 0.8 ? "  (too high)" : "");
+            ui::Text(TextFormat("PLACEMENT %.1f deg%s", lastPlacementErr_, dir), ui::VW() * 0.5f, ui::VH() * 0.5f + 90.0f, 22.0f,
+                     lastPlacementErr_ < 2.5 ? ui::theme::kGood : (lastPlacementErr_ < 6.0 ? ui::theme::kWarn : ui::theme::kAccent),
+                     ui::Align::Center);
+        }
+    }
+
+protected:
+    bool AimHead() const override { return true; }
+    double TtkStart(const Target& target) const override { return target.spawnTime; }
+
+    void OnTargetPresented(Target& target, double t) override {
+        ArmReaction(t);
+        // Where was the crosshair when the agent became visible?
+        const Vector3 eye = ctx_.cam->Eye();
+        const Vector3 head = TargetAimPoint(target, true);
+        double yaw = 0.0, pitch = 0.0;
+        AnglesFromDirection(Vector3{head.x - eye.x, head.y - eye.y, head.z - eye.z}, yaw, pitch);
+        const double err = AngleToPoint(*ctx_.cam, head);
+        stats_.placementErrSum += err;
+        stats_.placementVertSum += ctx_.cam->Pitch() - pitch;
+        stats_.placementCount++;
+        lastPlacementErr_ = err;
+        lastPlacementVert_ = ctx_.cam->Pitch() - pitch;
+        lastPlacementTime_ = t;
+        placementAtSpawn_ = err;
+    }
+
+    void OnHit(size_t /*index*/, const TargetHit& hit, double t) override {
+        const double exposed = t - targets_[0].spawnTime;
+        // Good pre-aim is worth up to 150, a fast kill up to 100.
+        const double placeBonus = std::max(0.0, 150.0 - placementAtSpawn_ * 25.0);
+        stats_.score += 100 + (hit.head ? 50 : 0) + static_cast<long long>(std::lround(placeBonus)) +
+                        static_cast<long long>(std::lround(Clamp(1.0 - exposed, 0.0, 1.0) * 100.0));
+        ctx_.audio->Play(hit.head ? Sfx::Headshot : Sfx::Kill);
+        targets_.clear();
+        nextAt_ = t + ctx_.rng->Uniform(0.6, 1.5);
+    }
+
+private:
+    static constexpr int kSpots = 6;
+
+    void Spawn() {
+        const int i = ctx_.rng->Int(0, kSpots - 1);
+        const int side = ctx_.rng->Sign();
+        // "Right" relative to the view direction towards the pillar.
+        const double y = val::DegToRad(spotYaw_[i]);
+        const Vector3 right = {static_cast<float>(std::cos(y)), 0.0f, static_cast<float>(std::sin(y))};
+        const float off = static_cast<float>(side) * 1.05f;
+        Target tg;
+        tg.kind = TargetKind::Humanoid;
+        tg.pos = Vector3{spots_[i].x + right.x * off, 0.0f, spots_[i].z + right.z * off};
+        tg.lifetime = 1.3 * ctx_.diff.time;
+        targets_.push_back(tg);
+    }
+
+    Vector3 spots_[kSpots] = {};
+    double spotYaw_[kSpots] = {};
+    double nextAt_ = 0.0;
+    double placementAtSpawn_ = 0.0;
+    double lastPlacementErr_ = 0.0;
+    double lastPlacementVert_ = 0.0;
+    double lastPlacementTime_ = -10.0;
 };
 
 // ===========================================================================
@@ -858,6 +999,7 @@ std::unique_ptr<Mode> CreateMode(ModeId id, const GameContext& ctx) {
         case ModeId::Flick180: return std::make_unique<Flick180Mode>(ctx);
         case ModeId::Reaction: return std::make_unique<ReactionMode>(ctx);
         case ModeId::Peek: return std::make_unique<PeekMode>(ctx);
+        case ModeId::Placement: return std::make_unique<PlacementMode>(ctx);
         case ModeId::Mixed: return std::make_unique<MixedMode>(ctx);
         default: return std::make_unique<GridshotMode>(ctx);
     }

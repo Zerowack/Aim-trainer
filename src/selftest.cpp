@@ -183,6 +183,20 @@ bool RunSelfTest(std::string& report) {
         c.True("rank: reaction 190 ms = Radiant", RankFromRecord(rx, r) && RankLabel(r) == "Radiant");
         rx.avgReactionMs = 420.0;
         c.True("rank: reaction 420 ms = Iron", RankFromRecord(rx, r) && r.tier == 0);
+        RunRecord hard = g;  // Silver 2 value at Normal...
+        hard.difficulty = Difficulty::Hard;  // ...x1.25 on Hard: 2.68 * 1.25 = 3.35 -> Gold 3
+        c.True("rank: Hard difficulty is worth more (Silver 2 -> Gold 3)", RankFromRecord(hard, r) && RankLabel(r) == "Gold 3");
+        RunRecord easy = g;
+        easy.difficulty = Difficulty::Easy;  // x0.75 -> 2.01 = Bronze 1
+        c.True("rank: Easy difficulty is worth less (Silver 2 -> Bronze 1)", RankFromRecord(easy, r) && RankLabel(r) == "Bronze 1");
+        RunRecord pl;
+        pl.mode = ModeId::Placement;
+        pl.duration = 60.0;
+        pl.hits = 20;
+        pl.placementErr = 6.5;  // Gold's start
+        c.True("rank: placement 6.5 deg = Gold 1", RankFromRecord(pl, r) && RankLabel(r) == "Gold 1");
+        pl.placementErr = 1.0;
+        c.True("rank: placement 1.0 deg = Radiant", RankFromRecord(pl, r) && RankLabel(r) == "Radiant");
         RunRecord shortRun = g;
         shortRun.duration = 10.0;
         c.True("rank: runs under 20 s are not ranked", !RankFromRecord(shortRun, r));

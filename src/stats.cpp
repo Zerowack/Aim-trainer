@@ -12,7 +12,7 @@ namespace {
 
 const char* const kCsvHeader =
     "timestamp,mode,duration_s,score,accuracy_pct,hits,misses,avg_reaction_ms,avg_ttk_ms,overshoot_pct,"
-    "tracking_pct,sens,dpi";
+    "tracking_pct,sens,dpi,difficulty,placement_err_deg";
 
 std::vector<std::string> SplitCsv(const std::string& line) {
     std::vector<std::string> out;
@@ -51,9 +51,16 @@ const char* ModeName(ModeId m) {
         case ModeId::Flick180: return "Flick 180";
         case ModeId::Reaction: return "Reaction";
         case ModeId::Peek: return "Peek Practice";
+        case ModeId::Placement: return "Crosshair Placement";
         case ModeId::Mixed: return "Sens Finder Test";
         default: return "?";
     }
+}
+
+const char* ModeShortName(ModeId m) {
+    if (m == ModeId::Placement) return "Placement";
+    if (m == ModeId::Peek) return "Peek";
+    return ModeName(m);
 }
 
 const char* ModeKey(ModeId m) {
@@ -64,6 +71,7 @@ const char* ModeKey(ModeId m) {
         case ModeId::Flick180: return "flick180";
         case ModeId::Reaction: return "reaction";
         case ModeId::Peek: return "peek";
+        case ModeId::Placement: return "placement";
         case ModeId::Mixed: return "mixed";
         default: return "unknown";
     }
@@ -77,6 +85,7 @@ const char* ModeDescription(ModeId m) {
         case ModeId::Flick180: return "Targets spawn beside or behind you. Big turns, clean stops.";
         case ModeId::Reaction: return "Wait for the target, then click as fast as you can. Measured in ms.";
         case ModeId::Peek: return "Agents peek from behind cover for a split second. Hold the angle.";
+        case ModeId::Placement: return "Keep your crosshair at head level on the angles. Scored on pre-aim.";
         case ModeId::Mixed: return "20 s of flicks, tracking and micro-adjustments.";
         default: return "";
     }
@@ -109,6 +118,46 @@ double RunStats::OvershootShare() const {
 double RunStats::MeanRelError() const { return relErrorCount > 0 ? relErrorSum / relErrorCount : 0.0; }
 double RunStats::MeanErrNorm() const { return errCount > 0 ? errNormSum / errCount : -1.0; }
 double RunStats::MeanErrDeg() const { return errCount > 0 ? errDegSum / errCount : -1.0; }
+double RunStats::MeanPlacementErr() const { return placementCount > 0 ? placementErrSum / placementCount : -1.0; }
+double RunStats::MeanPlacementVert() const { return placementCount > 0 ? placementVertSum / placementCount : 0.0; }
+double RunStats::HeadLevelPct() const { return headLevelTotal > 0.0 ? headLevelTime / headLevelTotal : -1.0; }
+
+DifficultyParams GetDifficulty(Difficulty d) {
+    switch (d) {
+        case Difficulty::Easy: return {1.35f, 1.40f, 0.75f, 0.75};
+        case Difficulty::Hard: return {0.78f, 0.78f, 1.20f, 1.25};
+        case Difficulty::Insane: return {0.60f, 0.60f, 1.40f, 1.50};
+        default: return {1.0f, 1.0f, 1.0f, 1.0};
+    }
+}
+
+const char* DifficultyName(Difficulty d) {
+    switch (d) {
+        case Difficulty::Easy: return "Easy";
+        case Difficulty::Hard: return "Hard";
+        case Difficulty::Insane: return "Insane";
+        default: return "Normal";
+    }
+}
+
+const char* DifficultyKey(Difficulty d) {
+    switch (d) {
+        case Difficulty::Easy: return "easy";
+        case Difficulty::Hard: return "hard";
+        case Difficulty::Insane: return "insane";
+        default: return "normal";
+    }
+}
+
+bool DifficultyFromKey(const std::string& key, Difficulty& out) {
+    for (int i = 0; i < kDifficultyCount; ++i) {
+        if (key == DifficultyKey(static_cast<Difficulty>(i))) {
+            out = static_cast<Difficulty>(i);
+            return true;
+        }
+    }
+    return false;
+}
 
 int SuggestedSensChangePct(const RunStats& s) {
     const int dirShots = s.overshoots + s.undershoots;
@@ -181,7 +230,29 @@ std::vector<std::string> BuildTips(const RunStats& s, double sens) {
         else if (rt < 220.0) tips.push_back("Excellent reaction time (" + Fmt(rt, 0) + " ms).");
     }
 
-    // 5) Precision.
+    // 5) Crosshair placement.
+    const double place = s.MeanPlacementErr();
+    if (place >= 0.0 && s.placementCount >= 5) {
+        const double vert = s.MeanPlacementVert();
+        if (vert < -1.0) {
+            tips.push_back("Your crosshair sits " + Fmt(-vert, 1) +
+                           " deg below head level on average. Raise it: in Valorant heads are at your eye line.");
+        } else if (vert > 1.0) {
+            tips.push_back("Your crosshair sits " + Fmt(vert, 1) + " deg above head level. Lower it slightly.");
+        }
+        if (place > 5.0) {
+            tips.push_back("Placement error " + Fmt(place, 1) +
+                           " deg. Pre-aim the edge of cover where agents can appear, not the middle of the wall.");
+        } else if (place < 2.0) {
+            tips.push_back("Great placement (" + Fmt(place, 1) + " deg). Most kills should need only a micro-adjustment.");
+        }
+        const double hl = s.HeadLevelPct();
+        if (hl >= 0.0 && hl < 0.5) {
+            tips.push_back("Crosshair at head level only " + Fmt(hl * 100.0, 0) + "% of the time. Keep it on the horizon line.");
+        }
+    }
+
+    // 6) Precision.
     const double errNorm = s.MeanErrNorm();
     if (errNorm > 1.3 && s.errCount >= 8) {
         tips.push_back("Clicks land " + Fmt(errNorm, 1) +
@@ -203,7 +274,9 @@ RunRecord MakeRecord(const RunStats& s, double sens, double dpi) {
     RunRecord r;
     r.timestamp = NowTimestamp();
     r.mode = s.mode;
+    r.difficulty = s.difficulty;
     r.duration = s.duration;
+    r.placementErr = s.MeanPlacementErr();
     r.score = s.score;
     r.accuracy = s.Accuracy() * 100.0;
     r.hits = s.hits;
@@ -260,6 +333,9 @@ void StatsStore::Load(const std::string& path) {
         r.trackingPct = ToD(f[10], -1.0);
         r.sens = ToD(f[11], 0.0);
         r.dpi = ToD(f[12], 0.0);
+        // Columns added in v1.6; older rows default to Normal.
+        if (f.size() >= 14) DifficultyFromKey(f[13], r.difficulty);
+        if (f.size() >= 15) r.placementErr = ToD(f[14], -1.0);
         records_.push_back(r);
     }
 }
@@ -277,7 +353,8 @@ bool StatsStore::Append(const RunRecord& r) {
     out << r.timestamp << ',' << ModeKey(r.mode) << ',' << Fmt(r.duration, 2) << ',' << r.score << ','
         << Fmt(r.accuracy, 2) << ',' << r.hits << ',' << r.misses << ',' << Fmt(r.avgReactionMs, 1) << ','
         << Fmt(r.avgTtkMs, 1) << ',' << Fmt(r.overshootPct, 1) << ',' << Fmt(r.trackingPct, 2) << ','
-        << Fmt(r.sens, 4) << ',' << Fmt(r.dpi, 0) << "\n";
+        << Fmt(r.sens, 4) << ',' << Fmt(r.dpi, 0) << ',' << DifficultyKey(r.difficulty) << ','
+        << Fmt(r.placementErr, 2) << "\n";
     return static_cast<bool>(out);
 }
 
@@ -287,6 +364,16 @@ std::vector<const RunRecord*> StatsStore::ForMode(ModeId m) const {
         if (r.mode == m) out.push_back(&r);
     }
     return out;
+}
+
+bool StatsStore::BestScore(ModeId m, Difficulty d, long long& out) const {
+    bool any = false;
+    for (const RunRecord& r : records_) {
+        if (r.mode != m || r.difficulty != d) continue;
+        if (!any || r.score > out) out = r.score;
+        any = true;
+    }
+    return any;
 }
 
 bool StatsStore::BestScore(ModeId m, long long& out) const {

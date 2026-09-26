@@ -13,7 +13,8 @@ Valorant:
   crosshair position where it happened, even in the middle of a frame.
 - **Timing:** FPS is uncapped by default with V-Sync off. You can set an optional cap (144/240/360, or any custom value from 30 to 2000),
   and an FPS counter shows frame time. All timing uses `QueryPerformanceCounter`.
-- **Six modes:** Gridshot, Microshot, Tracking (ADAD strafes), Flick 180, Reaction and Peek Practice.
+- **Seven modes:** Gridshot, Microshot, Tracking (ADAD strafes), Flick 180, Reaction, Peek Practice
+  and Crosshair Placement, each with Easy / Normal / Hard / Insane difficulty.
 - **Sens Finder:** uses the Perfect Sensitivity Approximation (PSA) method. It runs 7 rounds of blind A/B
   tests, draws a graph of your results, and has a one-click "apply" button. Every session
   is saved and combined into an average across days.
@@ -179,7 +180,8 @@ mode, use **MINIMIZE** on the main menu or in the pause menu, or press Alt-Tab o
 **Modes** (60 s by default, adjustable in Settings → Gameplay, with a 3 s countdown):
 
 1. **Gridshot**: 3 body-sized targets on a grid 10 m away. Destroy one and a new one spawns.
-2. **Microshot**: head-sized (~25 cm) targets at 10–16 m that vanish after 1.4 s.
+2. **Microshot**: head-sized (~25 cm) targets at 10–16 m that vanish after 1.4 s. **One bullet per
+   target**: miss it and it's gone.
 3. **Tracking**: a 1.75 m agent at 13 m doing Valorant-style ADAD strafes at 5.4 m/s,
    with random timing and counter-strafe stops. Hold fire while on target; the score is time-on-target %.
 4. **Flick 180**: targets spawn 90–180° to your side or behind you. An arrow points to them.
@@ -187,6 +189,15 @@ mode, use **MINIMIZE** on the main menu or in the pause menu, or press Alt-Tab o
    Timing starts at the first frame that shows the target. Clicking early costs points.
 6. **Peek Practice**: agents swing out from behind three cover boxes for a short
    window, like holding an angle. Headshots score extra.
+7. **Crosshair Placement**: agents appear beside pillars placed at different angles and distances.
+   You're scored on where your crosshair **already was** when an agent appeared (the angle to its
+   head), plus how much of the time you keep it at head level. In Valorant that's your eye line.
+   The coach tells you if you hold your crosshair too low or too high.
+
+**Difficulty:** after clicking a mode you choose Easy, Normal, Hard or Insane (keys 1–4, and Enter
+repeats the last one). Difficulty scales target size, time windows, movement speed and distance.
+Harder runs count for more towards your aim rank (Easy ×0.75, Hard ×1.25, Insane ×1.5), and
+personal bests are kept per difficulty.
 
 **Results:** score, accuracy, hits/misses, average reaction time, average TTK,
 over/undershoot, average click error and coaching tips.
