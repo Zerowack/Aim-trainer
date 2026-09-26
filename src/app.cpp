@@ -305,7 +305,10 @@ void App::EndRun() {
 
     hadPreviousBest_ = stats_.BestScore(s.mode, previousBest_);
     lastWasPb_ = !hadPreviousBest_ || s.score > previousBest_;
-    stats_.Append(MakeRecord(s, cfg_.sens, cfg_.dpi));
+    const RunRecord record = MakeRecord(s, cfg_.sens, cfg_.dpi);
+    stats_.Append(record);
+    lastRunRanked_ = RankFromRecord(record, lastRunRank_);
+    lastModeRanked_ = ModeRank(stats_, s.mode, lastModeRank_);
     lastStats_ = s;
     resultsShownAt_ = platform::Now();
     lastTips_ = BuildTips(s, cfg_.sens);

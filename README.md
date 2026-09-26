@@ -189,6 +189,14 @@ Alt-tab or any focus loss pauses the run and releases the cursor immediately.
 **Results:** score, accuracy, hits/misses, average reaction time, average TTK,
 over/undershoot, average click error and coaching tips.
 
+**Aim rank (estimate):** every ranked run (20 s or longer) gets a Valorant-style tier from
+Iron 1 to Radiant, based on that mode's core stat weighted by accuracy:
+kills per second for Gridshot, Microshot, Flick 180 and Peek, time on target for Tracking,
+and average ms for Reaction. A mode's rank is the median of its last 5 runs. Your overall
+rank on the main menu averages all modes you've played (at least 3 are needed). This
+estimates **aim only**: real rank also depends on game sense, utility and teamwork, and the
+tier cut-offs are calibrated estimates, not official Riot data.
+
 **Auto-adjust sens (optional):** turn on Settings → Sensitivity → *Auto-adjust sens from coach*
 and the coach's over/undershoot suggestion is applied to your sens after each run
 (2–15% at a time). It only changes when the run has enough flick data and a clear
@@ -246,6 +254,7 @@ Copy the new value into Valorant to keep both games the same. Everything is appe
 | `src/modes.h`, `src/modes.cpp` | the six training modes and the mixed Sens Finder test |
 | `src/sens_finder.h`, `src/sens_finder.cpp` | PSA logic, scoring, session storage and averaging |
 | `src/stats.h`, `src/stats.cpp` | run statistics, coaching tips, `stats.csv` |
+| `src/rank.h`, `src/rank.cpp` | estimated aim rank (tier thresholds per mode) |
 | `src/config.h`, `src/config.cpp` | settings and `config.ini` |
 | `src/crosshair.h`, `src/crosshair.cpp` | crosshair drawing and share codes |
 | `src/ui.h`, `src/ui.cpp` | dark, sharp-angled immediate-mode UI and charts |

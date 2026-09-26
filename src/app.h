@@ -11,12 +11,13 @@
 #include "effects.h"
 #include "modes.h"
 #include "platform.h"
+#include "rank.h"
 #include "rng.h"
 #include "sens_finder.h"
 #include "stats.h"
 #include "world.h"
 
-constexpr const char* kAppVersion = "1.2.0";
+constexpr const char* kAppVersion = "1.3.0";
 
 // Game clock = real time minus all time spent paused.
 struct GameClock {
@@ -139,7 +140,11 @@ private:
     double autoSensBefore_ = 0.0;
     int autoSensPct_ = 0;
     bool hadPreviousBest_ = false;
-    double resultsShownAt_ = 0.0;   // for the score count-up animation
+    double resultsShownAt_ = 0.0;
+    bool lastRunRanked_ = false;
+    AimRank lastRunRank_;
+    bool lastModeRanked_ = false;
+    AimRank lastModeRank_;   // for the score count-up animation
 
     // --- sens finder
     SensFinder finder_;

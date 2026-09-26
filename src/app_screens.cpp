@@ -113,6 +113,50 @@ bool Card(Rectangle r, ModeId mode, const std::string& title, const std::string&
     return hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
+// Rank badge: angular hexagon in the tier colour with division pips below.
+// Original design (no Riot rank artwork).
+void RankBadge(float cx, float cy, float size, const AimRank& r) {
+    const Color c = TierColor(r.tier);
+    const Color dark = {18, 21, 28, 255};
+    auto hexPoint = [&](int i, float rad) {
+        const float a = (60.0f * static_cast<float>(i) - 90.0f) * 3.14159265f / 180.0f;
+        return Vector2{cx + std::cos(a) * rad, cy + std::sin(a) * rad};
+    };
+    const float R = size * 0.5f;
+    for (int i = 0; i < 6; ++i) Tri(Vector2{cx, cy}, hexPoint(i, R), hexPoint(i + 1, R), c);
+    for (int i = 0; i < 6; ++i) Tri(Vector2{cx, cy}, hexPoint(i, R * 0.78f), hexPoint(i + 1, R * 0.78f), dark);
+    // Chevron in the middle; higher tiers get a second one.
+    auto chevron = [&](float oy, float k) {
+        Tri(Vector2{cx - R * 0.42f * k, cy + oy}, Vector2{cx, cy + oy - R * 0.34f * k}, Vector2{cx, cy + oy - R * 0.14f * k}, c);
+        Tri(Vector2{cx - R * 0.42f * k, cy + oy}, Vector2{cx, cy + oy - R * 0.14f * k}, Vector2{cx - R * 0.42f * k, cy + oy + R * 0.2f * k}, c);
+        Tri(Vector2{cx + R * 0.42f * k, cy + oy}, Vector2{cx, cy + oy - R * 0.14f * k}, Vector2{cx, cy + oy - R * 0.34f * k}, c);
+        Tri(Vector2{cx + R * 0.42f * k, cy + oy}, Vector2{cx + R * 0.42f * k, cy + oy + R * 0.2f * k}, Vector2{cx, cy + oy - R * 0.14f * k}, c);
+    };
+    if (r.tier >= kTierCount - 1) {
+        Circle(Vector2{cx, cy}, R * 0.3f, c);
+        CircleLines(Vector2{cx, cy}, R * 0.95f, 2.0f, Alpha(c, 0.6f));
+    } else if (r.tier >= 5) {
+        chevron(R * 0.02f, 1.0f);
+        chevron(R * 0.30f, 0.8f);
+    } else {
+        chevron(R * 0.12f, 1.0f);
+    }
+    // Division pips (3 bars, filled up to the division).
+    if (r.tier < kTierCount - 1) {
+        const float pw = size * 0.16f, ph = size * 0.06f, gap = size * 0.05f;
+        const float total = 3.0f * pw + 2.0f * gap;
+        for (int i = 0; i < 3; ++i) {
+            const Rectangle pip = {cx - total * 0.5f + static_cast<float>(i) * (pw + gap), cy + R + size * 0.08f, pw, ph};
+            Fill(pip, i < r.division ? c : Alpha(c, 0.25f));
+        }
+    }
+}
+
+// Text colour-coded to the tier.
+void RankText(const AimRank& r, float x, float y, float size, Align a = Align::Left) {
+    TextBold(RankLabel(r), x, y, size, TierColor(r.tier), a);
+}
+
 const Color kColorPresets[] = {
     {255, 255, 255, 255}, {0, 255, 0, 255},   {127, 255, 0, 255}, {223, 255, 0, 255},
     {255, 255, 0, 255},   {0, 255, 255, 255}, {255, 0, 255, 255}, {255, 60, 60, 255},
@@ -197,7 +241,10 @@ void App::ScreenMainMenu() {
         const float cx = x0 + static_cast<float>(i % 2) * (cw + gap);
         const float cy = 200.0f + static_cast<float>(i / 2) * (ch + gap);
         long long best = 0;
-        const std::string footer = stats_.BestScore(m, best) ? "BEST " + std::to_string(best) + "   >  PLAY" : ">  PLAY";
+        std::string footer = stats_.BestScore(m, best) ? "BEST " + std::to_string(best) + "   " : "";
+        AimRank mr;
+        if (ModeRank(stats_, m, mr)) footer += RankLabel(mr) + "   ";
+        footer += ">  PLAY";
         if (Card(Rectangle{cx, cy, cw, ch}, m, ModeName(m), ModeDescription(m), footer, i + 1)) {
             StartRun(m, false);
             return;
@@ -240,6 +287,23 @@ void App::ScreenMainMenu() {
     if (Button(Rectangle{rx, by, rw, 64.0f}, "QUIT")) {
         quit_ = true;
         return;
+    }
+
+    // Estimated aim rank.
+    const Rectangle rp = {rx, by + 88.0f, rw, 150.0f};
+    Angled(rp, theme::kPanel, 16.0f);
+    Text("AIM RANK (ESTIMATE)", rp.x + 24.0f, rp.y + 16.0f, 18.0f, theme::kAccent);
+    AimRank overall;
+    int modesUsed = 0;
+    if (OverallRank(stats_, overall, &modesUsed)) {
+        RankBadge(rp.x + 70.0f, rp.y + 82.0f, 70.0f, overall);
+        RankText(overall, rp.x + 130.0f, rp.y + 52.0f, 36.0f);
+        Text(TextFormat("From %d modes (last 5 runs each)", modesUsed), rp.x + 130.0f, rp.y + 96.0f, 16.0f, theme::kTextDim);
+        Text("Aim only - not an official rank", rp.x + 130.0f, rp.y + 118.0f, 16.0f, Alpha(theme::kTextDim, 0.7f));
+    } else {
+        TextBlock(TextFormat("Play %d different modes (20 s+ runs) to get your overall aim rank. Modes ranked: %d / %d.",
+                             kMinModesForOverall, modesUsed, kMinModesForOverall),
+                  rp.x + 24.0f, rp.y + 48.0f, rp.width - 48.0f, 18.0f, theme::kTextDim);
     }
 
     if (selfTestRan_) {
@@ -298,7 +362,36 @@ void App::ScreenResults() {
     tile(3, 1, "AVG CLICK ERROR", s.MeanErrDeg() >= 0.0 ? Fmt(s.MeanErrDeg(), 2) + " deg" : "-", theme::kText);
 
     // Coaching tips.
-    const Rectangle tipsR = {x0, 440.0f, kContentWidth, 300.0f};
+    // Rank strip: this run's rank + progress, and the mode rank (last 5 runs).
+    {
+        const Rectangle rr = {x0, 424.0f, kContentWidth, 72.0f};
+        Angled(rr, theme::kPanel, 14.0f);
+        if (lastRunRanked_) {
+            RankBadge(rr.x + 44.0f, rr.y + 32.0f, 44.0f, lastRunRank_);
+            Text("THIS RUN", rr.x + 84.0f, rr.y + 12.0f, 16.0f, theme::kTextDim);
+            RankText(lastRunRank_, rr.x + 84.0f, rr.y + 32.0f, 28.0f);
+            if (lastRunRank_.tier < kTierCount - 1) {
+                const Rectangle bar = {rr.x + 300.0f, rr.y + 40.0f, 360.0f, 8.0f};
+                Fill(bar, theme::kBg);
+                Fill(Rectangle{bar.x, bar.y, bar.width * static_cast<float>(lastRunRank_.progress), bar.height},
+                     TierColor(lastRunRank_.tier));
+                const AimRank next = RankFromPoints(std::floor(lastRunRank_.points) + 1.0);
+                Text(TextFormat("%.0f%% to %s", lastRunRank_.progress * 100.0, RankLabel(next).c_str()), bar.x, rr.y + 14.0f,
+                     16.0f, theme::kTextDim);
+            }
+            if (lastModeRanked_) {
+                Text(TextFormat("%s RANK (LAST 5 RUNS)", ModeName(s.mode)), rr.x + 720.0f, rr.y + 12.0f, 16.0f, theme::kTextDim);
+                RankText(lastModeRank_, rr.x + 720.0f, rr.y + 32.0f, 28.0f);
+            }
+            Text("Aim-only estimate", rr.x + rr.width - 24.0f, rr.y + 28.0f, 16.0f, Alpha(theme::kTextDim, 0.7f), Align::Right);
+        } else {
+            Text(s.duration < kMinRankedSeconds ? "Runs shorter than 20 s are not ranked."
+                                                : "Not enough hits in this run to estimate a rank.",
+                 rr.x + 24.0f, rr.y + 26.0f, 20.0f, theme::kTextDim);
+        }
+    }
+
+    const Rectangle tipsR = {x0, 508.0f, kContentWidth, 232.0f};
     Angled(tipsR, theme::kPanel, 16.0f);
     Text("COACH", tipsR.x + 24.0f, tipsR.y + 18.0f, 22.0f, theme::kAccent);
     float ty = tipsR.y + 56.0f;
@@ -676,7 +769,13 @@ void App::ScreenStats() {
     }
     const float tw = (kContentWidth - 40.0f) / 5.0f;
     const float ty = 206.0f;
-    StatTile(Rectangle{x0, ty, tw, 96.0f}, "RUNS", std::to_string(runs.size()), theme::kText);
+    {
+        AimRank mr;
+        int ranked = 0;
+        const bool has = ModeRank(stats_, m, mr, &ranked);
+        StatTile(Rectangle{x0, ty, tw, 96.0f}, TextFormat("RANK  (%d runs)", static_cast<int>(runs.size())),
+                 has ? RankLabel(mr) : "-", has ? TierColor(mr.tier) : theme::kText);
+    }
     StatTile(Rectangle{x0 + (tw + 10.0f), ty, tw, 96.0f}, "BEST SCORE", runs.empty() ? "-" : std::to_string(bestScore),
              theme::kAccent);
     StatTile(Rectangle{x0 + 2.0f * (tw + 10.0f), ty, tw, 96.0f}, "BEST ACCURACY", runs.empty() ? "-" : Fmt(bestAcc, 1) + "%",

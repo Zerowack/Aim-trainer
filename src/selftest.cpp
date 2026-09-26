@@ -7,6 +7,7 @@
 #include "camera.h"
 #include "crosshair.h"
 #include "sens_finder.h"
+#include "rank.h"
 #include "stats.h"
 
 namespace {
@@ -151,6 +152,40 @@ bool RunSelfTest(std::string& report) {
         few.overshoots = 3;
         few.undershoots = 1;
         c.True("coach: too little data -> no change", SuggestedSensChangePct(few) == 0);
+    }
+
+    // --- Aim rank estimate ---------------------------------------------------
+    {
+        c.True("rank: 0 points = Iron 1", RankLabel(RankFromPoints(0.0)) == "Iron 1");
+        c.True("rank: 3 points = Bronze 1", RankLabel(RankFromPoints(3.0)) == "Bronze 1");
+        c.True("rank: 10.5 points = Gold 2", RankLabel(RankFromPoints(10.5)) == "Gold 2");
+        c.True("rank: 23.9 points = Immortal 3", RankLabel(RankFromPoints(23.9)) == "Immortal 3");
+        c.True("rank: 24 points = Radiant", RankLabel(RankFromPoints(24.0)) == "Radiant");
+        RunRecord g;
+        g.mode = ModeId::Gridshot;
+        g.duration = 60.0;
+        g.hits = 126;  // 2.1 kills/s at 100% = exactly Gold's start
+        g.accuracy = 100.0;
+        AimRank r;
+        c.True("rank: gridshot 2.1 kills/s = Gold 1", RankFromRecord(g, r) && RankLabel(r) == "Gold 1");
+        g.accuracy = 25.0;  // same kills, sqrt(0.25) = half the value
+        c.True("rank: accuracy matters (25% acc drops to Iron/Bronze)", RankFromRecord(g, r) && r.tier <= 1);
+        RunRecord rx;
+        rx.mode = ModeId::Reaction;
+        rx.duration = 60.0;
+        rx.hits = 20;
+        rx.avgReactionMs = 275.0;
+        c.True("rank: reaction 275 ms = Gold 1", RankFromRecord(rx, r) && RankLabel(r) == "Gold 1");
+        rx.avgReactionMs = 190.0;
+        c.True("rank: reaction 190 ms = Radiant", RankFromRecord(rx, r) && RankLabel(r) == "Radiant");
+        rx.avgReactionMs = 420.0;
+        c.True("rank: reaction 420 ms = Iron", RankFromRecord(rx, r) && r.tier == 0);
+        RunRecord shortRun = g;
+        shortRun.duration = 10.0;
+        c.True("rank: runs under 20 s are not ranked", !RankFromRecord(shortRun, r));
+        RunRecord mixed = g;
+        mixed.mode = ModeId::Mixed;
+        c.True("rank: sens finder tests are not ranked", !RankFromRecord(mixed, r));
     }
 
     // --- Crosshair share code round trip ------------------------------------

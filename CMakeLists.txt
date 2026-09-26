@@ -76,6 +76,8 @@ add_executable(Valtrainer WIN32
     src/modes.h
     src/platform.h
     src/platform_win32.cpp
+    src/rank.cpp
+    src/rank.h
     src/rng.h
     src/selftest.cpp
     src/selftest.h
@@ -124,6 +126,7 @@ add_executable(ValtrainerSelfTest
     src/selftest.cpp
     src/camera.cpp
     src/crosshair.cpp
+    src/rank.cpp
     src/sens_finder.cpp
     src/stats.cpp
 )
