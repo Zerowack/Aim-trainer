@@ -37,6 +37,16 @@ double GameHorizontalFov(double aspect) {
     return HorizontalFovFromVertical(GameVerticalFov(), aspect);
 }
 
+double ScopedSens(double sens, double scopedMultiplier, double zoom) {
+    if (zoom <= 1.0) return sens;
+    return sens * scopedMultiplier / zoom;
+}
+
+double ZoomedVerticalFov(double zoom) {
+    if (zoom <= 1.0) return GameVerticalFov();
+    return RadToDeg(2.0 * std::atan(std::tan(DegToRad(GameVerticalFov()) * 0.5) / zoom));
+}
+
 double NormalizeDeg(double deg) {
     deg = std::fmod(deg, 360.0);
     if (deg > 180.0) deg -= 360.0;
@@ -104,14 +114,14 @@ Vector3 ValCamera::Forward() const { return DirectionFromAngles(yaw_, pitch_); }
 
 Ray ValCamera::AimRay() const { return Ray{Eye(), Forward()}; }
 
-Camera3D ValCamera::ToRaylib() const {
+Camera3D ValCamera::ToRaylib(double zoom) const {
     Camera3D c = {};
     const Vector3 eye = Eye();
     const Vector3 f = Forward();
     c.position = eye;
     c.target = Vector3{eye.x + f.x, eye.y + f.y, eye.z + f.z};
     c.up = Vector3{0.0f, 1.0f, 0.0f};
-    c.fovy = static_cast<float>(val::GameVerticalFov());
+    c.fovy = static_cast<float>(val::ZoomedVerticalFov(zoom));
     c.projection = CAMERA_PERSPECTIVE;
     return c;
 }

@@ -94,6 +94,13 @@ void DrawModeIcon(ModeId m, float cx, float cy, float s, Color c) {
             Fill(Rectangle{cx - s * 0.02f, cy - s * 0.07f, s * 0.2f, s * 0.5f}, c);
             Fill(Rectangle{cx - s * 0.5f, cy - s * 0.35f, s * 0.46f, s * 0.8f}, Alpha(c, 0.35f));
             break;
+        case ModeId::Sniper:
+            // Scope: circle, reticle and a red dot.
+            CircleLines(Vector2{cx, cy}, s * 0.42f, t, c);
+            Line(Vector2{cx - s * 0.42f, cy}, Vector2{cx + s * 0.42f, cy}, 2.0f, Alpha(c, 0.8f));
+            Line(Vector2{cx, cy - s * 0.42f}, Vector2{cx, cy + s * 0.42f}, 2.0f, Alpha(c, 0.8f));
+            Circle(Vector2{cx, cy}, s * 0.06f, theme::kAccent);
+            break;
         case ModeId::Placement:
             // Pillar, head-level line and a crosshair resting on it.
             Fill(Rectangle{cx + s * 0.2f, cy - s * 0.45f, s * 0.2f, s * 0.9f}, Alpha(c, 0.35f));
@@ -216,14 +223,16 @@ void App::ScreenMainMenu() {
         const float cx = x0 + static_cast<float>(i % 2) * (cw + gap);
         const float cy = 200.0f + static_cast<float>(i / 2) * (ch + gap);
         long long best = 0;
-        std::string footer = stats_.BestScore(m, currentDifficulty_, best)
+        std::string footer = m == ModeId::Sniper ? std::string(SniperName(static_cast<SniperWeapon>(cfg_.sniperWeapon))) + "   " : "";
+        footer += stats_.BestScore(m, currentDifficulty_, best)
                                  ? "BEST " + std::to_string(best) + " (" + DifficultyName(currentDifficulty_) + ")   "
                                  : "";
         AimRank mr;
         if (ModeRank(stats_, m, mr)) footer += RankLabel(mr) + "   ";
         footer += ">  PLAY";
         if (Card(Rectangle{cx, cy, cw, ch}, m, ModeName(m), ModeDescription(m), footer, i + 1)) {
-            ChooseDifficulty(m);
+            if (m == ModeId::Sniper) screen_ = Screen::SniperSelect;  // pick the rifle first
+            else ChooseDifficulty(m);
             return;
         }
     }
@@ -308,7 +317,9 @@ void App::ScreenMainMenu() {
 void App::ScreenResults() {
     const float x0 = ContentX();
     const RunStats& s = lastStats_;
-    Title(std::string(ModeName(s.mode)) + " (" + DifficultyName(s.difficulty) + ")  -  RESULTS", x0, 60.0f, 52.0f);
+    Title(std::string(ModeName(s.mode)) + (s.mode == ModeId::Sniper ? std::string(" ") + SniperName(s.weapon) : std::string()) +
+              " (" + DifficultyName(s.difficulty) + ")  -  RESULTS",
+          x0, 60.0f, 52.0f);
     if (lastWasPb_) {
         Angled(Rectangle{x0 + 6.0f, 136.0f, 330.0f, 40.0f}, theme::kAccent, 10.0f);
         Text(hadPreviousBest_ ? "NEW PERSONAL BEST" : "FIRST RUN - PB SET", x0 + 171.0f, 144.0f, 22.0f, theme::kText,
@@ -497,6 +508,20 @@ void App::SettingsSensitivity(float x, float y, float w) {
                          360.0 / val::DegreesPerCount(cfg_.sens)),
               x, y + 390.0f, w * 0.75f, 20.0f, theme::kText);
 
+    // Scoped sensitivity (Valorant: Settings > General > Mouse > Scoped Sensitivity Multiplier).
+    Text("SCOPED SENSITIVITY MULTIPLIER", x + 800.0f, y, 20.0f, theme::kTextDim);
+    if (TextBox(Rectangle{x + 800.0f, y + 28.0f, 240.0f, 54.0f}, 13, &scopedMultText_, 6, true) &&
+        ParseNumber(scopedMultText_, 0.01, 10.0, v)) {
+        cfg_.scopedMult = v;
+    }
+    Text("Same as Valorant (default 1.0)", x + 1060.0f, y + 44.0f, 18.0f, theme::kTextDim);
+    for (int i = 0; i < 3; ++i) {
+        static const double zooms[3] = {2.5, 3.5, 5.0};
+        static const char* const what[3] = {"Operator 1st zoom", "Marshal / Outlaw", "Operator 2nd zoom"};
+        const double eff = val::ScopedSens(cfg_.sens, cfg_.scopedMult, zooms[i]);
+        Text(TextFormat("%s  %.1fx:  eff. sens %.4f  |  %.1f cm/360", what[i], zooms[i], eff, val::Cm360(cfg_.dpi, eff)),
+             x + 800.0f, y + 100.0f + static_cast<float>(i) * 26.0f, 17.0f, theme::kText);
+    }
     Toggle(Rectangle{x, y + 450.0f, std::min(760.0f, w), 50.0f}, "Auto-adjust sens from coach", &cfg_.autoSens);
     TextBlock("When on, the coach's over/undershoot suggestion (for example \"you overshoot, lower sens ~5%\") is "
               "applied to your sens automatically after each run, 2-15% at a time. It only changes when a run has enough "
@@ -703,7 +728,8 @@ void App::SettingsKeybinds(float x, float y, float w) {
     Row rows[] = {{"Shoot", &cfg_.keys.shoot, true},
                   {"Restart run", &cfg_.keys.restart, false},
                   {"Pause (Esc always pauses too)", &cfg_.keys.pause, false},
-                  {"Toggle FPS counter", &cfg_.keys.toggleFps, false}};
+                  {"Toggle FPS counter", &cfg_.keys.toggleFps, false},
+                  {"Scope (Sniper mode)", &cfg_.keys.scope, false}};
     const float cw = std::min(900.0f, w);
 
     // Capture the next key/button (skipping the click that started capture).
@@ -723,7 +749,7 @@ void App::SettingsKeybinds(float x, float y, float w) {
         }
     }
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 5; ++i) {
         const float ry = y + static_cast<float>(i) * 72.0f;
         Fill(Rectangle{x, ry, cw, 60.0f}, theme::kPanel);
         Text(rows[i].name, x + 20.0f, ry + 18.0f, 22.0f, theme::kText);
@@ -733,10 +759,11 @@ void App::SettingsKeybinds(float x, float y, float w) {
             rebindStartFrame_ = frameCounter_;
         }
     }
-    if (!xhMessage_.empty() && settingsTab_ == 5) Text(xhMessage_, x, y + 300.0f, 20.0f, theme::kWarn);
+    Toggle(Rectangle{x, y + 372.0f, cw, 50.0f}, "Hold to scope (off = toggle, like Valorant's default)", &cfg_.scopeHold);
+    if (!xhMessage_.empty() && settingsTab_ == 5) Text(xhMessage_, x, y + 430.0f, 20.0f, theme::kWarn);
     TextBlock("Shooting on a mouse button is read directly from Raw Input together with the movement, so each click is "
               "evaluated at the exact crosshair position it happened at. A keyboard shoot key is evaluated per frame.",
-              x, y + 340.0f, cw, 20.0f, theme::kTextDim);
+              x, y + 470.0f, cw, 20.0f, theme::kTextDim);
 }
 
 // ===========================================================================
@@ -822,7 +849,9 @@ void App::ScreenStats() {
         Text(MsOrDash(r.avgTtkMs), x0 + cols[4], ry, 18.0f, c);
         Text(r.overshootPct >= 0.0 ? Fmt(r.overshootPct, 0) + "%" : "-", x0 + cols[5], ry, 18.0f, c);
         Text(TextFormat("%.3f @ %.0f", r.sens, r.dpi), x0 + cols[6], ry, 18.0f, c);
-        Text(DifficultyName(r.difficulty), x0 + cols[7], ry, 18.0f, c);
+        Text(r.mode == ModeId::Sniper ? TextFormat("%s / %s", DifficultyName(r.difficulty), SniperName(r.weapon))
+                                      : DifficultyName(r.difficulty),
+             x0 + cols[7], ry, 18.0f, c);
         ry += 28.0f;
     }
     if (runs.empty()) Text("Play this mode to start tracking progress.", x0, ry, 20.0f, theme::kTextDim);
@@ -832,7 +861,8 @@ void App::ScreenStats() {
         return;
     }
     if (Button(Rectangle{x0 + 280.0f, VH() - 100.0f, 360.0f, 60.0f}, TextFormat("PLAY %s", ModeName(m)))) {
-        ChooseDifficulty(m);
+        if (m == ModeId::Sniper) screen_ = Screen::SniperSelect;
+        else ChooseDifficulty(m);
         return;
     }
     Text("All runs are stored in stats.csv next to the .exe.", x0 + 670.0f, VH() - 80.0f, 18.0f, theme::kTextDim);
@@ -1083,21 +1113,21 @@ void App::ScreenRank() {
     const float mx = x0 + 660.0f, mw = kContentWidth - 660.0f;
     for (int i = 0; i < kPlayableModeCount; ++i) {
         const ModeId m = static_cast<ModeId>(i);
-        const Rectangle row = {mx, 160.0f + static_cast<float>(i) * 78.0f, mw, 70.0f};
+        const Rectangle row = {mx, 160.0f + static_cast<float>(i) * 70.0f, mw, 62.0f};
         Angled(row, theme::kPanel, 12.0f);
         AimRank mr;
         int ranked = 0;
         const bool has = ModeRank(stats_, m, mr, &ranked);
         if (has) {
-            DrawRankBadge(row.x + 42.0f, row.y + 30.0f, 46.0f, mr);
+            DrawRankBadge(row.x + 40.0f, row.y + 26.0f, 40.0f, mr);
         } else {
-            DrawRankBadge(row.x + 42.0f, row.y + 30.0f, 46.0f, AimRank{}, 0.2f, false);
+            DrawRankBadge(row.x + 40.0f, row.y + 26.0f, 40.0f, AimRank{}, 0.2f, false);
         }
-        TextBold(ModeName(m), row.x + 84.0f, row.y + 10.0f, 22.0f, theme::kText);
-        Text(has ? TextFormat("%d ranked runs", ranked) : "Not ranked yet - play a 20 s+ run", row.x + 84.0f, row.y + 40.0f,
-             16.0f, theme::kTextDim);
+        TextBold(ModeName(m), row.x + 80.0f, row.y + 8.0f, 21.0f, theme::kText);
+        Text(has ? TextFormat("%d ranked runs", ranked) : "Not ranked yet - play a 20 s+ run", row.x + 80.0f, row.y + 36.0f,
+             15.0f, theme::kTextDim);
         if (has) {
-            RankText(mr, row.x + row.width - 24.0f, row.y + 20.0f, 28.0f, Align::Right);
+            RankText(mr, row.x + row.width - 24.0f, row.y + 16.0f, 27.0f, Align::Right);
         }
     }
 
@@ -1132,7 +1162,10 @@ void App::ChooseDifficulty(ModeId mode) {
 
 void App::ScreenDifficulty() {
     const float x0 = ContentX();
-    Title(ModeName(pickMode_), x0, 50.0f, 52.0f);
+    Title(pickMode_ == ModeId::Sniper
+              ? std::string("Sniper - ") + SniperName(static_cast<SniperWeapon>(cfg_.sniperWeapon))
+              : std::string(ModeName(pickMode_)),
+          x0, 50.0f, 52.0f);
     Text("CHOOSE DIFFICULTY", x0 + 6.0f, 124.0f, 22.0f, theme::kAccent);
     Text(ModeDescription(pickMode_), x0 + 6.0f, 156.0f, 20.0f, theme::kTextDim);
 
@@ -1184,7 +1217,72 @@ void App::ScreenDifficulty() {
         return;
     }
     if (Button(Rectangle{x0, VH() - 100.0f, 260.0f, 60.0f}, "BACK") || IsKeyPressed(KEY_ESCAPE)) {
-        screen_ = Screen::MainMenu;
+        screen_ = pickMode_ == ModeId::Sniper ? Screen::SniperSelect : Screen::MainMenu;
     }
     Text("Keys 1-4 pick a difficulty, Enter repeats the last one.", x0 + 290.0f, VH() - 80.0f, 18.0f, theme::kTextDim);
+}
+
+// ===========================================================================
+// Sniper rifle picker (then the difficulty picker)
+
+void App::ScreenSniperSelect() {
+    const float x0 = ContentX();
+    Title("SNIPER", x0, 50.0f, 52.0f);
+    Text("CHOOSE YOUR RIFLE", x0 + 6.0f, 124.0f, 22.0f, theme::kAccent);
+    Text(TextFormat("%s scopes (toggle or hold in Settings > Keybinds). Scoped sens multiplier: %.2f.",
+                    input::BindName(cfg_.keys.scope).c_str(), cfg_.scopedMult),
+         x0 + 6.0f, 156.0f, 20.0f, theme::kTextDim);
+
+    static const char* const blurbs[kSniperCount] = {
+        "Light bolt-action. Fast follow-up shots and decent unscoped accuracy.",
+        "Double-barrel. Two quick shots, then a reload.",
+        "The AWP of Valorant. One shot, slow bolt, two zoom levels, useless hipfire."};
+    const float gap = 20.0f;
+    const float cw = (kContentWidth - 2.0f * gap) / 3.0f;
+    int picked = -1;
+    for (int i = 0; i < kSniperCount; ++i) {
+        const SniperWeapon wpn = static_cast<SniperWeapon>(i);
+        const SniperSpec sp = GetSniperSpec(wpn);
+        const Rectangle r = {x0 + static_cast<float>(i) * (cw + gap), 210.0f, cw, 460.0f};
+        const float a = HoverAnim(r);
+        const bool last = i == cfg_.sniperWeapon;
+        Angled(r, Lerp2(theme::kPanel, theme::kPanel2, a), 18.0f);
+        Fill(Rectangle{r.x, r.y, r.width - 18.0f, 5.0f + 3.0f * a}, theme::kAccent);
+        if (last) Border(r, 2.0f, Alpha(theme::kAccent, 0.7f));
+        Text(TextFormat("%d", i + 1), r.x + r.width - 24.0f, r.y + 20.0f, 20.0f, Alpha(theme::kTextDim, 0.6f), Align::Right);
+        TextBold(sp.name, r.x + 28.0f, r.y + 28.0f, 44.0f, theme::kText);
+        TextBlock(blurbs[i], r.x + 28.0f, r.y + 90.0f, r.width - 56.0f, 18.0f, theme::kTextDim);
+        // Scope glyph.
+        DrawModeIcon(ModeId::Sniper, r.x + r.width * 0.5f, r.y + 200.0f, 90.0f, Lerp2(theme::kTextDim, theme::kText, a));
+        const float ly = r.y + 268.0f;
+        const std::string zoomText = sp.zoom2 > 0.0 ? TextFormat("%.1fx / %.1fx", sp.zoom1, sp.zoom2) : TextFormat("%.1fx", sp.zoom1);
+        Text("Zoom", r.x + 28.0f, ly, 20.0f, theme::kTextDim);
+        Text(zoomText, r.x + r.width - 28.0f, ly, 20.0f, theme::kText, Align::Right);
+        Text("Fire rate", r.x + 28.0f, ly + 30.0f, 20.0f, theme::kTextDim);
+        Text(TextFormat("%.2f / s", 1.0 / sp.shotInterval), r.x + r.width - 28.0f, ly + 30.0f, 20.0f, theme::kText, Align::Right);
+        Text("Magazine / reload", r.x + 28.0f, ly + 60.0f, 20.0f, theme::kTextDim);
+        Text(TextFormat("%d / %.1f s", sp.magazine, sp.reloadTime), r.x + r.width - 28.0f, ly + 60.0f, 20.0f, theme::kText,
+             Align::Right);
+        Text("Unscoped spread", r.x + 28.0f, ly + 90.0f, 20.0f, theme::kTextDim);
+        Text(TextFormat("%.1f deg", sp.hipSpreadDeg), r.x + r.width - 28.0f, ly + 90.0f, 20.0f, theme::kText, Align::Right);
+        const double eff = val::ScopedSens(cfg_.sens, cfg_.scopedMult, sp.zoom1);
+        Text(TextFormat("Scoped: %.1f cm/360", val::Cm360(cfg_.dpi, eff)), r.x + 28.0f, ly + 130.0f, 18.0f, theme::kAccent);
+        if (last) Text("LAST USED", r.x + r.width - 28.0f, ly + 130.0f, 16.0f, theme::kAccent, Align::Right);
+        if (Hover(r) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) picked = i;
+        if (IsKeyPressed(KEY_ONE + i) || IsKeyPressed(KEY_KP_1 + i)) picked = i;
+    }
+    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER)) picked = cfg_.sniperWeapon;
+    Text("Stats approximate Valorant's rifles. Agents only appear when your rifle is ready, so every rifle can reach "
+         "the same rank.", x0, 700.0f, 18.0f, theme::kTextDim);
+
+    if (picked >= 0) {
+        cfg_.sniperWeapon = picked;
+        SaveConfig();
+        ChooseDifficulty(ModeId::Sniper);
+        return;
+    }
+    if (Button(Rectangle{x0, VH() - 100.0f, 260.0f, 60.0f}, "BACK") || IsKeyPressed(KEY_ESCAPE)) {
+        screen_ = Screen::MainMenu;
+    }
+    Text("Keys 1-3 pick a rifle, Enter repeats the last one.", x0 + 290.0f, VH() - 80.0f, 18.0f, theme::kTextDim);
 }

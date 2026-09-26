@@ -35,16 +35,19 @@ int CaptureBind();
 // Walks the ordered raw stream collected this frame. Every movement chunk
 // rotates the camera immediately (and is recorded in the aim history); every
 // press of the shoot binding calls onShot with the camera already rotated by
-// all movement that happened before the click. 'toGameTime' converts
-// platform::Now() timestamps to the game clock.
+// all movement that happened before the click. Other mouse buttons go to
+// onButton (e.g. scoping), so a scope-in mid-frame changes the sensitivity
+// for exactly the packets after it. 'sens' is read for every movement chunk.
+// 'toGameTime' converts platform::Now() timestamps to the game clock.
 struct RawStreamResult {
     long totalDx = 0;
     long totalDy = 0;
 };
 
 RawStreamResult ProcessRawStream(const std::vector<platform::RawEvent>& events, ValCamera& cam,
-                                 AimHistory& history, double sens, int shootBind, bool& triggerHeld,
-                                 const std::function<double(double)>& toGameTime,
-                                 const std::function<void(double)>& onShot);
+                                 AimHistory& history, const std::function<double()>& sens, int shootBind,
+                                 bool& triggerHeld, const std::function<double(double)>& toGameTime,
+                                 const std::function<void(double)>& onShot,
+                                 const std::function<void(int, bool, double)>& onButton);
 
 }  // namespace input

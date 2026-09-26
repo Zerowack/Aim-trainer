@@ -52,6 +52,7 @@ Config::Config() {
     keys.restart = KEY_R;
     keys.pause = KEY_P;
     keys.toggleFps = KEY_F2;
+    keys.scope = input::MouseBind(1);  // right mouse button
 }
 
 int Config::FpsCap() const {
@@ -101,6 +102,10 @@ bool Config::Load(const std::string& path) {
     keys.restart = GetI(kv, "key_restart", keys.restart);
     keys.pause = GetI(kv, "key_pause", keys.pause);
     keys.toggleFps = GetI(kv, "key_toggle_fps", keys.toggleFps);
+    keys.scope = GetI(kv, "key_scope", keys.scope);
+    scopedMult = ClampD(GetD(kv, "scoped_sens_multiplier", scopedMult), 0.01, 10.0);
+    sniperWeapon = ClampI(GetI(kv, "sniper_weapon", sniperWeapon), 0, 2);
+    scopeHold = GetB(kv, "scope_hold", scopeHold);
 
     auto it = kv.find("crosshair");
     if (it != kv.end()) {
@@ -139,6 +144,10 @@ bool Config::Save(const std::string& path) const {
     out << "key_restart=" << keys.restart << "\n";
     out << "key_pause=" << keys.pause << "\n";
     out << "key_toggle_fps=" << keys.toggleFps << "\n";
+    out << "key_scope=" << keys.scope << "\n";
+    out << "scoped_sens_multiplier=" << scopedMult << "\n";
+    out << "sniper_weapon=" << sniperWeapon << "   # 0=marshal 1=outlaw 2=operator\n";
+    out << "scope_hold=" << (scopeHold ? 1 : 0) << "\n";
     out << "crosshair=" << EncodeCrosshair(crosshair) << "\n";
     return static_cast<bool>(out);
 }

@@ -81,9 +81,10 @@ int CaptureBind() {
 }
 
 RawStreamResult ProcessRawStream(const std::vector<platform::RawEvent>& events, ValCamera& cam,
-                                 AimHistory& history, double sens, int shootBind, bool& triggerHeld,
-                                 const std::function<double(double)>& toGameTime,
-                                 const std::function<void(double)>& onShot) {
+                                 AimHistory& history, const std::function<double()>& sens, int shootBind,
+                                 bool& triggerHeld, const std::function<double(double)>& toGameTime,
+                                 const std::function<void(double)>& onShot,
+                                 const std::function<void(int, bool, double)>& onButton) {
     RawStreamResult r;
     const bool mouseShoot = IsMouseBind(shootBind);
     const int shootButton = mouseShoot ? MouseBindButton(shootBind) : -1;
@@ -91,7 +92,7 @@ RawStreamResult ProcessRawStream(const std::vector<platform::RawEvent>& events, 
     for (const platform::RawEvent& e : events) {
         const double t = toGameTime(e.time);
         if (e.button < 0) {
-            cam.ApplyCounts(e.dx, e.dy, sens);
+            cam.ApplyCounts(e.dx, e.dy, sens());
             history.Push(t, cam.Yaw(), cam.Pitch());
             r.totalDx += e.dx;
             r.totalDy += e.dy;
@@ -102,6 +103,8 @@ RawStreamResult ProcessRawStream(const std::vector<platform::RawEvent>& events, 
             } else if (!e.down) {
                 triggerHeld = false;
             }
+        } else if (onButton) {
+            onButton(MouseBind(e.button), e.down, t);
         }
     }
     return r;

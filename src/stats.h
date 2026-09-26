@@ -4,9 +4,16 @@
 #include <string>
 #include <vector>
 
-enum class ModeId : int { Gridshot = 0, Microshot, Tracking, Flick180, Reaction, Peek, Placement, Mixed, Count };
+enum class ModeId : int { Gridshot = 0, Microshot, Tracking, Flick180, Reaction, Peek, Placement, Sniper, Mixed, Count };
 
-constexpr int kPlayableModeCount = 7;  // everything except Mixed (sens finder only)
+constexpr int kPlayableModeCount = 8;  // everything except Mixed (sens finder only)
+
+// Sniper rifles for the Sniper mode.
+enum class SniperWeapon : int { Marshal = 0, Outlaw, Operator, Count };
+constexpr int kSniperCount = 3;
+const char* SniperName(SniperWeapon w);  // "Operator"
+const char* SniperKey(SniperWeapon w);   // "operator" (CSV)
+bool SniperFromKey(const std::string& key, SniperWeapon& out);
 
 // Difficulty picked before each run. It scales target size, time windows,
 // movement speed and distance, and the rank value (harder = worth more).
@@ -35,6 +42,7 @@ bool ModeFromKey(const std::string& key, ModeId& out);
 struct RunStats {
     ModeId mode = ModeId::Gridshot;
     Difficulty difficulty = Difficulty::Normal;
+    SniperWeapon weapon = SniperWeapon::Operator;  // Sniper mode only
     double duration = 0.0;  // seconds actually played
 
     long long score = 0;
@@ -98,6 +106,7 @@ struct RunRecord {
     std::string timestamp;
     ModeId mode = ModeId::Gridshot;
     Difficulty difficulty = Difficulty::Normal;
+    SniperWeapon weapon = SniperWeapon::Operator;  // meaningful for Sniper runs only
     double duration = 0.0;
     long long score = 0;
     double accuracy = 0.0;      // percent

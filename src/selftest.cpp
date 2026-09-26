@@ -93,6 +93,14 @@ bool RunSelfTest(std::string& report) {
     c.Near("horizontal FOV @ 4:3", val::GameHorizontalFov(4.0 / 3.0), 86.6319709, 1e-5);
     c.Near("horizontal FOV @ 21:9", val::GameHorizontalFov(21.0 / 9.0), 117.5643840, 1e-5);
 
+    // --- Scoped sensitivity (Valorant: sens x multiplier / zoom) -------------
+    c.Near("scoped sens 0.4 @ 2.5x, multiplier 1.0", val::ScopedSens(0.4, 1.0, 2.5), 0.16, 1e-12);
+    c.Near("scoped sens 0.4 @ 5x, multiplier 0.8", val::ScopedSens(0.4, 0.8, 5.0), 0.064, 1e-12);
+    c.Near("unscoped sens unchanged", val::ScopedSens(0.4, 0.5, 1.0), 0.4, 1e-12);
+    // 2 x atan(tan(70.53/2) / 2.5) = 31.589 degrees
+    c.Near("vertical FOV at 2.5x zoom", val::ZoomedVerticalFov(2.5), 31.5886, 1e-3);
+    c.Near("zoom 1.0 keeps the normal FOV", val::ZoomedVerticalFov(1.0), val::GameVerticalFov(), 1e-12);
+
     // --- Direction helpers -------------------------------------------------
     double yaw = 0.0, pitch = 0.0;
     AnglesFromDirection(DirectionFromAngles(-123.0, 31.0), yaw, pitch);

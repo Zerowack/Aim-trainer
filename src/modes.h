@@ -28,7 +28,23 @@ struct GameContext {
     float brightness = 1.0f;  // map brightness (targets are never dimmed)
     Difficulty difficulty = Difficulty::Normal;
     DifficultyParams diff = GetDifficulty(Difficulty::Normal);
+    // Sniper mode
+    SniperWeapon weapon = SniperWeapon::Operator;
+    int scopeBind = 1001;   // input bind code (default Mouse 2)
+    bool scopeHold = false; // hold to scope instead of toggle
 };
+
+// Approximate Valorant sniper stats (zoom = magnification).
+struct SniperSpec {
+    const char* name;
+    int magazine;
+    double shotInterval;  // seconds between shots
+    double reloadTime;    // seconds
+    double zoom1;
+    double zoom2;         // 0 = only one zoom level
+    double hipSpreadDeg;  // unscoped inaccuracy (radius)
+};
+SniperSpec GetSniperSpec(SniperWeapon w);
 
 // ADAD strafing movement shared by Tracking and the sens finder test.
 // Mimics Valorant: ~5.4 m/s run speed, very fast acceleration, random timing,
@@ -76,6 +92,14 @@ public:
     void OnPresented(double t);
 
     virtual void Draw3D() const;
+    // Scope support (Sniper mode): current magnification (1 = not zoomed),
+    // whether the normal crosshair is hidden, and mouse/key button events
+    // other than shooting (bind code, pressed/released, game time).
+    virtual double Zoom() const { return 1.0; }
+    virtual bool HideCrosshair() const { return false; }
+    // Full-screen overlay drawn under the HUD (e.g. the sniper scope).
+    virtual void DrawOverlay() const {}
+    virtual void OnButton(int /*bindCode*/, bool /*down*/, double /*t*/) {}
     // Mode specific HUD (virtual UI coordinates, see ui.h).
     virtual void DrawHud(double t) const;
 
@@ -94,6 +118,8 @@ protected:
     virtual double TtkStart(const Target& target) const;
     // Aim at the head of humanoids (for shot analysis).
     virtual bool AimHead() const { return false; }
+    // The ray a shot travels along (snipers add unscoped spread).
+    virtual Ray ShotRay() { return ctx_.cam->AimRay(); }
 
     // Shared helpers
     void TickTargets(double dt);

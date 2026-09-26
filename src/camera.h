@@ -39,6 +39,11 @@ double HorizontalFovFromVertical(double vFovDeg, double aspect);
 double GameVerticalFov();
 // Horizontal FOV actually shown on a screen with the given aspect ratio.
 double GameHorizontalFov(double aspect);
+// Scoped sensitivity: Valorant divides the turn rate by the zoom, then applies
+// the "Scoped Sensitivity Multiplier" (1.0 keeps the same on-screen speed).
+double ScopedSens(double sens, double scopedMultiplier, double zoom);
+// Vertical FOV while zoomed (zoom = magnification, e.g. 2.5 for Operator).
+double ZoomedVerticalFov(double zoom);
 // Wraps an angle into (-180, 180].
 double NormalizeDeg(double deg);
 
@@ -81,7 +86,7 @@ public:
     Vector3 Eye() const;
     Vector3 Forward() const;
     Ray AimRay() const;
-    Camera3D ToRaylib() const;
+    Camera3D ToRaylib(double zoom = 1.0) const;
 
 private:
     double yaw_ = 0.0;    // degrees, 0 = looking down -Z, positive = right

@@ -144,6 +144,7 @@ void App::SetSens(double sens) {
 void App::SyncSensText() {
     dpiText_ = Trimmed(cfg_.dpi, 0);
     customFpsText_ = std::to_string(cfg_.customFpsCap);
+    scopedMultText_ = Trimmed(cfg_.scopedMult, 3);
     sensText_ = Trimmed(cfg_.sens, 4);
 }
 
@@ -228,6 +229,7 @@ void App::Frame() {
         case Screen::FinderFinal: ui::Backdrop(); ScreenFinderFinal(); break;
         case Screen::Rank: ui::Backdrop(); ScreenRank(); break;
         case Screen::Difficulty: ui::Backdrop(); ScreenDifficulty(); break;
+        case Screen::SniperSelect: ui::Backdrop(); ScreenSniperSelect(); break;
     }
     if (screen_ != Screen::Playing) DrawFpsCounter();
 
@@ -278,6 +280,9 @@ void App::StartRun(ModeId id, bool finderTest) {
     // The sens finder test always runs at Normal so its scores are comparable.
     ctx.difficulty = finderTest ? ::Difficulty::Normal : currentDifficulty_;
     ctx.diff = GetDifficulty(ctx.difficulty);
+    ctx.weapon = static_cast<SniperWeapon>(cfg_.sniperWeapon);
+    ctx.scopeBind = cfg_.keys.scope;
+    ctx.scopeHold = cfg_.scopeHold;
 
     mode_.reset();  // destroy the old mode first (it may own world covers)
     mode_ = CreateMode(id, ctx);
@@ -391,12 +396,24 @@ void App::UpdatePlaying(const std::vector<platform::RawEvent>& events, double no
     // orientation they happened at.
     Mode* mode = mode_.get();
     const bool live = live_;
+    // Sensitivity is re-read for every packet: scoping in mid-frame applies
+    // the scoped sens (sens x multiplier / zoom) to exactly the packets after it.
+    const double baseSens = ActiveSens();
+    const double scopedMult = cfg_.scopedMult;
     input::ProcessRawStream(
-        events, cam_, history_, ActiveSens(), cfg_.keys.shoot, triggerHeld_,
-        [this](double t) { return clock_.Game(t); },
+        events, cam_, history_, [mode, baseSens, scopedMult]() { return val::ScopedSens(baseSens, scopedMult, mode->Zoom()); },
+        cfg_.keys.shoot, triggerHeld_, [this](double t) { return clock_.Game(t); },
         [mode, live](double t) {
             if (live) mode->OnShot(t);
+        },
+        [mode, live](int bind, bool down, double t) {
+            if (live) mode->OnButton(bind, down, t);
         });
+    // Keyboard scope bind (frame precision).
+    if (live_ && !input::IsMouseBind(cfg_.keys.scope) && cfg_.keys.scope > 0) {
+        if (IsKeyPressed(cfg_.keys.scope)) mode_->OnButton(cfg_.keys.scope, true, g);
+        if (IsKeyReleased(cfg_.keys.scope)) mode_->OnButton(cfg_.keys.scope, false, g);
+    }
 
     // Keyboard shoot bind (frame precision).
     if (!input::IsMouseBind(cfg_.keys.shoot)) {
@@ -428,7 +445,7 @@ void App::DrawPlaying() {
     const float b = cfg_.mapBrightness;
     ClearBackground(world_.SkyColor(b));
 
-    BeginMode3D(cam_.ToRaylib());
+    BeginMode3D(cam_.ToRaylib(mode_ ? mode_->Zoom() : 1.0));
     world_.BeginFrame(cam_.Eye(), b);
     world_.DrawRange();
     if (mode_) mode_->Draw3D();
@@ -436,8 +453,9 @@ void App::DrawPlaying() {
     EndMode3D();
 
     const double g = clock_.Game(platform::Now());
+    if (mode_) mode_->DrawOverlay();
     DrawHud(g);
-    DrawCrosshair(cfg_.crosshair, GetScreenWidth() / 2, GetScreenHeight() / 2);
+    if (!mode_ || !mode_->HideCrosshair()) DrawCrosshair(cfg_.crosshair, GetScreenWidth() / 2, GetScreenHeight() / 2);
     DrawHitFeedback(g);
     if (paused_) DrawPauseMenu();
 }
@@ -540,11 +558,17 @@ void App::DrawHud(double g) {
 
     if (cfg_.showFovInfo) {
         const double aspect = static_cast<double>(GetScreenWidth()) / std::max(1, GetScreenHeight());
+        const double zoom = mode_ ? mode_->Zoom() : 1.0;
         const double sens = ActiveSens();
-        std::string info = TextFormat("HFOV %.1f  VFOV %.1f  |  %dx%d", val::GameHorizontalFov(aspect), val::GameVerticalFov(),
+        const double vfov = val::ZoomedVerticalFov(zoom);
+        std::string info = TextFormat("HFOV %.1f  VFOV %.1f  |  %dx%d", val::HorizontalFovFromVertical(vfov, aspect), vfov,
                                       GetScreenWidth(), GetScreenHeight());
         if (finderRun_) {
             info += "  |  SENS HIDDEN (A/B TEST)";
+        } else if (zoom > 1.0) {
+            const double eff = val::ScopedSens(sens, cfg_.scopedMult, zoom);
+            info += TextFormat("  |  SCOPED %.1fx  x%.2f  |  effective sens %.4f  |  %.1f cm/360", zoom, cfg_.scopedMult, eff,
+                               val::Cm360(cfg_.dpi, eff));
         } else {
             info += TextFormat("  |  SENS %.3f  |  %.0f DPI  |  eDPI %.0f  |  %.1f cm/360", sens, cfg_.dpi,
                                val::Edpi(cfg_.dpi, sens), val::Cm360(cfg_.dpi, sens));

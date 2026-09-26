@@ -12,7 +12,7 @@ namespace {
 
 const char* const kCsvHeader =
     "timestamp,mode,duration_s,score,accuracy_pct,hits,misses,avg_reaction_ms,avg_ttk_ms,overshoot_pct,"
-    "tracking_pct,sens,dpi,difficulty,placement_err_deg";
+    "tracking_pct,sens,dpi,difficulty,placement_err_deg,weapon";
 
 std::vector<std::string> SplitCsv(const std::string& line) {
     std::vector<std::string> out;
@@ -52,6 +52,7 @@ const char* ModeName(ModeId m) {
         case ModeId::Reaction: return "Reaction";
         case ModeId::Peek: return "Peek Practice";
         case ModeId::Placement: return "Crosshair Placement";
+        case ModeId::Sniper: return "Sniper";
         case ModeId::Mixed: return "Sens Finder Test";
         default: return "?";
     }
@@ -72,6 +73,7 @@ const char* ModeKey(ModeId m) {
         case ModeId::Reaction: return "reaction";
         case ModeId::Peek: return "peek";
         case ModeId::Placement: return "placement";
+        case ModeId::Sniper: return "sniper";
         case ModeId::Mixed: return "mixed";
         default: return "unknown";
     }
@@ -86,6 +88,7 @@ const char* ModeDescription(ModeId m) {
         case ModeId::Reaction: return "Wait for the target, then click as fast as you can. Measured in ms.";
         case ModeId::Peek: return "Agents peek from behind cover for a split second. Hold the angle.";
         case ModeId::Placement: return "Keep your crosshair at head level on the angles. Scored on pre-aim.";
+        case ModeId::Sniper: return "Marshal, Outlaw or Operator. Scope in and pick agents off at long range.";
         case ModeId::Mixed: return "20 s of flicks, tracking and micro-adjustments.";
         default: return "";
     }
@@ -121,6 +124,32 @@ double RunStats::MeanErrDeg() const { return errCount > 0 ? errDegSum / errCount
 double RunStats::MeanPlacementErr() const { return placementCount > 0 ? placementErrSum / placementCount : -1.0; }
 double RunStats::MeanPlacementVert() const { return placementCount > 0 ? placementVertSum / placementCount : 0.0; }
 double RunStats::HeadLevelPct() const { return headLevelTotal > 0.0 ? headLevelTime / headLevelTotal : -1.0; }
+
+const char* SniperName(SniperWeapon w) {
+    switch (w) {
+        case SniperWeapon::Marshal: return "Marshal";
+        case SniperWeapon::Outlaw: return "Outlaw";
+        default: return "Operator";
+    }
+}
+
+const char* SniperKey(SniperWeapon w) {
+    switch (w) {
+        case SniperWeapon::Marshal: return "marshal";
+        case SniperWeapon::Outlaw: return "outlaw";
+        default: return "operator";
+    }
+}
+
+bool SniperFromKey(const std::string& key, SniperWeapon& out) {
+    for (int i = 0; i < kSniperCount; ++i) {
+        if (key == SniperKey(static_cast<SniperWeapon>(i))) {
+            out = static_cast<SniperWeapon>(i);
+            return true;
+        }
+    }
+    return false;
+}
 
 DifficultyParams GetDifficulty(Difficulty d) {
     switch (d) {
@@ -275,6 +304,7 @@ RunRecord MakeRecord(const RunStats& s, double sens, double dpi) {
     r.timestamp = NowTimestamp();
     r.mode = s.mode;
     r.difficulty = s.difficulty;
+    r.weapon = s.weapon;
     r.duration = s.duration;
     r.placementErr = s.MeanPlacementErr();
     r.score = s.score;
@@ -336,6 +366,7 @@ void StatsStore::Load(const std::string& path) {
         // Columns added in v1.6; older rows default to Normal.
         if (f.size() >= 14) DifficultyFromKey(f[13], r.difficulty);
         if (f.size() >= 15) r.placementErr = ToD(f[14], -1.0);
+        if (f.size() >= 16) SniperFromKey(f[15], r.weapon);
         records_.push_back(r);
     }
 }
@@ -354,7 +385,7 @@ bool StatsStore::Append(const RunRecord& r) {
         << Fmt(r.accuracy, 2) << ',' << r.hits << ',' << r.misses << ',' << Fmt(r.avgReactionMs, 1) << ','
         << Fmt(r.avgTtkMs, 1) << ',' << Fmt(r.overshootPct, 1) << ',' << Fmt(r.trackingPct, 2) << ','
         << Fmt(r.sens, 4) << ',' << Fmt(r.dpi, 0) << ',' << DifficultyKey(r.difficulty) << ','
-        << Fmt(r.placementErr, 2) << "\n";
+        << Fmt(r.placementErr, 2) << ',' << (r.mode == ModeId::Sniper ? SniperKey(r.weapon) : "-") << "\n";
     return static_cast<bool>(out);
 }
 

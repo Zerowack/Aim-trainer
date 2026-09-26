@@ -21,6 +21,7 @@ struct Keybinds {
     int restart;
     int pause;     // Esc always pauses too; this is an extra key
     int toggleFps;
+    int scope;     // Sniper mode (default Mouse 2)
 };
 
 struct Config {
@@ -29,6 +30,8 @@ struct Config {
     // Sensitivity
     double dpi = 800.0;
     double sens = 0.4;
+    // Valorant's "Scoped Sensitivity Multiplier" (0.01 .. 10, default 1).
+    double scopedMult = 1.0;
     // Apply the coach's over/undershoot sens suggestion automatically after runs.
     bool autoSens = false;
 
@@ -46,7 +49,9 @@ struct Config {
     Color targetColor = Color{80, 220, 255, 255};
     float mapBrightness = 1.0f;  // 0.2 .. 1.6
     bool roastMode = true;
-    int difficulty = 1;          // last picked difficulty (0 easy .. 3 insane)       // funny rank comments ("your aim is ...")
+    int difficulty = 1;          // last picked difficulty (0 easy .. 3 insane)
+    int sniperWeapon = 2;        // 0 Marshal, 1 Outlaw, 2 Operator
+    bool scopeHold = false;      // hold to scope (Valorant "Hold to aim down sights")       // funny rank comments ("your aim is ...")
 
     // Audio
     float masterVolume = 0.8f;

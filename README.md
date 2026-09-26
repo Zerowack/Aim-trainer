@@ -13,8 +13,9 @@ Valorant:
   crosshair position where it happened, even in the middle of a frame.
 - **Timing:** FPS is uncapped by default with V-Sync off. You can set an optional cap (144/240/360, or any custom value from 30 to 2000),
   and an FPS counter shows frame time. All timing uses `QueryPerformanceCounter`.
-- **Seven modes:** Gridshot, Microshot, Tracking (ADAD strafes), Flick 180, Reaction, Peek Practice
-  and Crosshair Placement, each with Easy / Normal / Hard / Insane difficulty.
+- **Eight modes:** Gridshot, Microshot, Tracking (ADAD strafes), Flick 180, Reaction, Peek Practice,
+  Crosshair Placement and Sniper (Marshal / Outlaw / Operator), each with Easy / Normal / Hard / Insane
+  difficulty. The **scoped sensitivity multiplier** works like Valorant's.
 - **Sens Finder:** uses the Perfect Sensitivity Approximation (PSA) method. It runs 7 rounds of blind A/B
   tests, draws a graph of your results, and has a one-click "apply" button. Every session
   is saved and combined into an average across days.
@@ -193,6 +194,17 @@ mode, use **MINIMIZE** on the main menu or in the pause menu, or press Alt-Tab o
    You're scored on where your crosshair **already was** when an agent appeared (the angle to its
    head), plus how much of the time you keep it at head level. In Valorant that's your eye line.
    The coach tells you if you hold your crosshair too low or too high.
+8. **Sniper**: pick a **Marshal**, **Outlaw** or **Operator**, then a difficulty. Agents appear at
+   20–36 m around the range. Right mouse scopes (Operator: 2.5× → 5× → unscoped). Scoped shots are
+   exact; unscoped shots get the rifle's hipfire spread (Operator 5°!), plus a no-scope bonus if they
+   land. Each rifle has its own fire rate, magazine and reload, based on Valorant's. Agents only
+   appear once your rifle is ready, so every rifle can reach the same rank. Choose toggle or hold
+   to scope, and rebind Scope, in Settings → Keybinds.
+
+**Scoped sensitivity:** Settings → Sensitivity → *Scoped sensitivity multiplier* is the same
+setting as Valorant's (Settings → General → Mouse). While scoped, each mouse count turns
+`0.07 × sens × multiplier ÷ zoom` degrees, so 1.0 keeps the same on-screen speed at every zoom level. The settings page shows your effective
+scoped sens and cm/360 for each zoom level.
 
 **Difficulty:** after clicking a mode you choose Easy, Normal, Hard or Insane (keys 1–4, and Enter
 repeats the last one). Difficulty scales target size, time windows, movement speed and distance.

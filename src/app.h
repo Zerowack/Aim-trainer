@@ -17,7 +17,7 @@
 #include "stats.h"
 #include "world.h"
 
-constexpr const char* kAppVersion = "1.6.0";
+constexpr const char* kAppVersion = "1.7.0";
 
 // Game clock = real time minus all time spent paused.
 struct GameClock {
@@ -52,7 +52,8 @@ enum class Screen {
     FinderRound,
     FinderFinal,
     Rank,
-    Difficulty
+    Difficulty,
+    SniperSelect
 };
 
 class App {
@@ -104,6 +105,7 @@ private:
     void ScreenFinderFinal();
     void ScreenRank();
     void ScreenDifficulty();
+    void ScreenSniperSelect();
     // Opens the difficulty picker for a mode (then starts the run).
     void ChooseDifficulty(ModeId mode);
     // Roast or neutral description, depending on the setting.
@@ -171,6 +173,7 @@ private:
     std::string dpiText_;
     std::string sensText_;
     std::string customFpsText_;
+    std::string scopedMultText_;
     std::string xhCodeText_;
     std::string xhMessage_;
     int statsMode_ = 0;
