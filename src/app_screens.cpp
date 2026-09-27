@@ -484,7 +484,8 @@ void App::ScreenMainMenu() {
         open(clicked);
         return;
     }
-    Text(TextFormat("%d entries  |  scroll for more  |  Esc pause  |  %s restart  |  %s FPS counter", static_cast<int>(shown.size()),
+    Text(TextFormat("%d %s  |  scroll for more  |  Esc pause  |  %s restart  |  %s FPS counter", static_cast<int>(shown.size()),
+                    shown.size() == 1 ? "entry" : "entries",
                     input::BindName(cfg_.keys.restart).c_str(), input::BindName(cfg_.keys.toggleFps).c_str()),
          x0, gridR.y + gridR.height + 10.0f, 18.0f, theme::kTextDim);
 
@@ -880,6 +881,11 @@ void App::SettingsGameplay(float x, float y, float w) {
     SliderF(Rectangle{x, y + 80.0f, cw, 54.0f}, "Map brightness", &cfg_.mapBrightness, 0.2f, 1.6f, "%.2f");
 
     Toggle(Rectangle{x, y + 470.0f, cw, 50.0f}, "Roast mode (funny rank comments)", &cfg_.roastMode);
+    Toggle(Rectangle{x, y + 530.0f, cw, 50.0f}, "Left-handed weapon (gun on the left)", &cfg_.leftHanded);
+    static const char* const kSwapNames[] = {"Follow Windows", "Normal", "Swapped (left-handed)"};
+    Stepper(Rectangle{x, y + 590.0f, cw, 50.0f}, "Mouse buttons", &cfg_.mouseButtonSwap, kSwapNames, 3);
+    Text(platform::MouseButtonsSwapped() ? "Mouse 1 = your physical right button" : "Mouse 1 = your physical left button", x + cw + 20.0f,
+         y + 604.0f, 18.0f, theme::kTextDim);
     Text("TARGET COLOUR", x, y + 170.0f, 20.0f, theme::kTextDim);
     const Color targetPresets[] = {{80, 220, 255, 255}, {255, 75, 87, 255},  {255, 220, 40, 255},
                                    {90, 255, 120, 255}, {255, 110, 230, 255}, {255, 255, 255, 255}};

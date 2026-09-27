@@ -1,6 +1,7 @@
 // config.cpp - Simple "key=value" config file.
 #include "config.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <map>
@@ -129,6 +130,8 @@ bool Config::Load(const std::string& path) {
     sniperWeapon = ClampI(GetI(kv, "sniper_weapon", sniperWeapon), 0, 2);
     botTier = ClampI(GetI(kv, "bot_tier", botTier), 0, 8);
     scopeHold = GetB(kv, "scope_hold", scopeHold);
+    leftHanded = GetB(kv, "left_handed", leftHanded);
+    mouseButtonSwap = std::max(0, std::min(2, GetI(kv, "mouse_button_swap", mouseButtonSwap)));
 
     auto it = kv.find("crosshair");
     if (it != kv.end()) {
@@ -181,6 +184,8 @@ bool Config::Save(const std::string& path) const {
     out << "scoped_sens_multiplier=" << scopedMult << "\n";
     out << "sniper_weapon=" << sniperWeapon << "   # 0=marshal 1=outlaw 2=operator\n";
     out << "scope_hold=" << (scopeHold ? 1 : 0) << "\n";
+    out << "left_handed=" << (leftHanded ? 1 : 0) << "\n";
+    out << "mouse_button_swap=" << mouseButtonSwap << "\n";
     out << "bot_tier=" << botTier << "   # VS Bot: 0=iron .. 8=radiant\n";
     out << "crosshair=" << EncodeCrosshair(crosshair) << "\n";
     return static_cast<bool>(out);

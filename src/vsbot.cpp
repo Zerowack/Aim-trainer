@@ -623,6 +623,9 @@ private:
         const double yr = val::DegToRad(ctx_.cam->Yaw());
         const Vector3 right = {static_cast<float>(std::cos(yr)), 0.0f, static_cast<float>(std::sin(yr))};
         const Vector3 up = Cross(right, f);
+        // Left-handed: the same gun mirrored to the left side of the screen.
+        const float side = ctx_.leftHanded ? -1.0f : 1.0f;
+        const Vector3 hand = Scale3(right, side);
         const float kick = static_cast<float>(viewKick_ * viewKick_);
         float dip = 0.0f;
         if (gun_.reloading) {
@@ -630,11 +633,11 @@ private:
             dip = std::sin(std::max(0.0f, std::min(1.0f, k)) * 3.14159265f) * 0.12f;
         }
         // Barrel points slightly in towards the crosshair and tilts up with the kick.
-        const Vector3 gf = Add3(Add3(f, Scale3(up, 0.35f * kick + 0.04f)), Scale3(right, -0.1f));
+        const Vector3 gf = Add3(Add3(f, Scale3(up, 0.35f * kick + 0.04f)), Scale3(hand, -0.1f));
         const Vector3 gfN = Scale3(gf, 1.0f / Len(gf));
         const Vector3 gu = Cross(right, gfN);
-        const Vector3 base = Add3(Add3(Add3(eye, Scale3(right, 0.19f)), Scale3(up, -0.17f - dip)), Scale3(f, 0.5f - 0.04f * kick));
-        auto part = [&](float r, float u, float fw) { return Add3(Add3(Add3(base, Scale3(right, r)), Scale3(gu, u)), Scale3(gfN, fw)); };
+        const Vector3 base = Add3(Add3(Add3(eye, Scale3(hand, 0.19f)), Scale3(up, -0.17f - dip)), Scale3(f, 0.5f - 0.04f * kick));
+        auto part = [&](float r, float u, float fw) { return Add3(Add3(Add3(base, Scale3(hand, r)), Scale3(gu, u)), Scale3(gfN, fw)); };
         const Color metal = {74, 78, 88, 255};
         const Color steel = {140, 146, 158, 255};
         const Color grip = {118, 84, 56, 255};

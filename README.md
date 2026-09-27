@@ -182,6 +182,12 @@ Valtrainer shows your eDPI (`DPI × sens`) and cm/360
 | Move / walk / crouch / jump (VS Bot, Sniper) | W A S D, Left Shift, Left Ctrl, Space |
 | Reload (VS Bot) | R |
 
+**Left-handed players:** Settings → Gameplay has **Left-handed weapon** (the first-person gun on the
+left, like Valorant's left-handed option) and **Mouse buttons**. Raw Input reads the physical buttons
+and ignores the Windows "switch primary and secondary buttons" setting, so by default Valtrainer
+follows that Windows setting itself: if your mouse buttons are swapped in Windows, they are swapped here
+too. You can also force Normal or Swapped.
+
 Alt-tab or any focus loss (including screenshot tools) pauses the run and releases the cursor
 immediately. While paused or in the background the app drops to 60 FPS so other programs stay smooth.
 To minimize in any display mode, click Valtrainer's taskbar button, press Win+Down, or use

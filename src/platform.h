@@ -65,6 +65,12 @@ bool ConsumeFocusLost();
 // Lets the taskbar button / Win+Down minimize the window in every display mode.
 void AllowMinimize();
 
+// Raw Input reports the physical buttons and ignores the Windows "switch primary
+// and secondary buttons" setting. 0 = follow that Windows setting, 1 = never
+// swap, 2 = always swap (left-handed mouse).
+void SetMouseButtonSwap(int mode);
+bool MouseButtonsSwapped();
+
 // What is in the foreground right now.
 enum class Foreground { None, Us, CaptureTool, Other };
 // CaptureTool = Snipping Tool / Win+Shift+S, ShareX, Lightshot, Game Bar, ...

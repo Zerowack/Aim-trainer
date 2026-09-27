@@ -51,6 +51,7 @@ double g_lastClipTime = -1.0;
 // Absolute-mode devices (remote desktop, some tablets / VMs) report positions
 // instead of deltas; we convert those into deltas so the app still works.
 bool g_haveAbsolute = false;
+int g_buttonSwapMode = 0;
 LONG g_lastAbsX = 0;
 LONG g_lastAbsY = 0;
 
@@ -93,6 +94,13 @@ void PushMove(long dx, long dy, double t) {
 
 void PushButton(int button, bool down, double t) {
     if (g_events.size() >= kMaxQueuedEvents) return;
+    if (MouseButtonsSwapped()) {
+        if (button == kRawLeft) {
+            button = kRawRight;
+        } else if (button == kRawRight) {
+            button = kRawLeft;
+        }
+    }
     RawEvent e;
     e.button = button;
     e.down = down;
@@ -398,6 +406,14 @@ void RunInBackground(void (*fn)(void*), void* arg) {
         fn(arg);  // no thread: do it now
         delete job;
     }
+}
+
+void SetMouseButtonSwap(int mode) { g_buttonSwapMode = mode; }
+
+bool MouseButtonsSwapped() {
+    if (g_buttonSwapMode == 1) return false;
+    if (g_buttonSwapMode == 2) return true;
+    return GetSystemMetrics(SM_SWAPBUTTON) != 0;
 }
 
 void AllowMinimize() {

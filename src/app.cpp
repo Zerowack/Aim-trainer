@@ -166,6 +166,7 @@ void App::Frame() {
     ++frameCounter_;
 
     // 1) Fresh input: dispatch all pending window messages (WM_INPUT, keys).
+    platform::SetMouseButtonSwap(cfg_.mouseButtonSwap);
     platform::PumpMessages();
     if (platform::QuitRequested()) quit_ = true;
 
@@ -334,6 +335,7 @@ void App::StartRun(ModeId id, bool finderTest) {
     ctx.weapon = static_cast<SniperWeapon>(cfg_.sniperWeapon);
     ctx.scopeBind = cfg_.keys.scope;
     ctx.scopeHold = cfg_.scopeHold;
+    ctx.leftHanded = cfg_.leftHanded;
     ctx.botTier = cfg_.botTier;
     ctx.moveKeys.forward = cfg_.keys.forward;
     ctx.moveKeys.back = cfg_.keys.back;

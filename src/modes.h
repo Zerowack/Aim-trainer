@@ -35,6 +35,7 @@ struct GameContext {
     SniperWeapon weapon = SniperWeapon::Operator;
     int scopeBind = 1001;   // input bind code (default Mouse 2)
     bool scopeHold = false; // hold to scope instead of toggle
+    bool leftHanded = false; // first-person gun on the left
     // VS Bot
     int botTier = 3;        // 0 Iron .. 8 Radiant
     // Movement / reload keys (VS Bot, Sniper)
