@@ -328,49 +328,63 @@ void App::ScreenMainMenu() {
         modeSearch_.clear();
         ClearFocus();
     }
-    // Category chips.
+    // Category chips: All, Plans, then the mode categories.
+    constexpr int kPlansCategory = 99;
     {
         const float chipX0 = searchR.x + searchR.width + 12.0f;
-        const float chipW = (x0 + gridW - chipX0 - 5.0f * 6.0f) / 6.0f;
-        for (int c = -1; c < kModeCategoryCount; ++c) {
-            const Rectangle cr = {chipX0 + static_cast<float>(c + 1) * (chipW + 6.0f), searchR.y, chipW, searchR.height};
-            const bool on = modeCategory_ == c;
-            if (Tab(cr, c < 0 ? "All" : CategoryName(static_cast<ModeCategory>(c)), on)) {
+        const int chips = kModeCategoryCount + 2;
+        const float chipW = (x0 + gridW - chipX0 - static_cast<float>(chips - 1) * 5.0f) / static_cast<float>(chips);
+        for (int k = 0; k < chips; ++k) {
+            const int c = k == 0 ? -1 : (k == 1 ? kPlansCategory : k - 2);
+            const Rectangle cr = {chipX0 + static_cast<float>(k) * (chipW + 5.0f), searchR.y, chipW, searchR.height};
+            const char* label = k == 0 ? "All" : (k == 1 ? "Plans" : CategoryName(static_cast<ModeCategory>(c)));
+            if (Tab(cr, label, modeCategory_ == c)) {
                 modeCategory_ = c;
                 menuScroll_ = 0.0f;
             }
         }
     }
 
-    // Matching modes.
+    // Entries: the two training plans first, then every mode.
+    constexpr int kWarmupEntry = 1000, kImproveEntry = 1001;
     auto lower = [](std::string v) {
         for (char& k : v) k = static_cast<char>(std::tolower(static_cast<unsigned char>(k)));
         return v;
     };
     const std::string q = lower(modeSearch_);
-    std::vector<ModeId> shown;
-    for (int i = 0; i < kPlayableModeCount; ++i) {
+    auto matches = [&](const std::string& hayRaw) {
+        if (q.empty()) return true;
+        const std::string hay = lower(hayRaw);
+        // Every word of the query must appear somewhere.
+        size_t p = 0;
+        while (p < q.size()) {
+            const size_t e = std::min(q.find(' ', p), q.size());
+            if (e > p && hay.find(q.substr(p, e - p)) == std::string::npos) return false;
+            p = e + 1;
+        }
+        return true;
+    };
+    std::vector<int> shown;
+    const bool plansOk = modeCategory_ == -1 || modeCategory_ == kPlansCategory;
+    if (plansOk && matches("Warmup warm up routine daily before playing plan 5 minutes")) shown.push_back(kWarmupEntry);
+    if (plansOk && matches("Improve my aim coach plan weakness weak adaptive training tasks")) shown.push_back(kImproveEntry);
+    for (int i = 0; i < kPlayableModeCount && modeCategory_ != kPlansCategory; ++i) {
         const ModeId m = static_cast<ModeId>(i);
         if (modeCategory_ >= 0 && static_cast<int>(CategoryOf(m)) != modeCategory_) continue;
-        if (!q.empty()) {
-            const std::string hay = lower(std::string(ModeName(m)) + " " + ModeTags(m) + " " + CategoryName(CategoryOf(m)) + " " +
-                                          ModeDescription(m));
-            // Every word of the query must appear somewhere.
-            bool all = true;
-            size_t p = 0;
-            while (p < q.size() && all) {
-                const size_t e = std::min(q.find(' ', p), q.size());
-                if (e > p && hay.find(q.substr(p, e - p)) == std::string::npos) all = false;
-                p = e + 1;
-            }
-            if (!all) continue;
+        if (!matches(std::string(ModeName(m)) + " " + ModeTags(m) + " " + CategoryName(CategoryOf(m)) + " " + ModeDescription(m))) {
+            continue;
         }
-        shown.push_back(m);
+        shown.push_back(i);
     }
+    auto open = [&](int entry) {
+        ClearFocus();
+        if (entry == kWarmupEntry) OpenPlan(PlanKind::Warmup);
+        else if (entry == kImproveEntry) OpenPlan(PlanKind::Improve);
+        else OpenModeSetup(static_cast<ModeId>(entry));
+    };
     // Enter opens the first match.
     if (!q.empty() && !shown.empty() && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))) {
-        ClearFocus();
-        OpenModeSetup(shown[0]);
+        open(shown[0]);
         return;
     }
 
@@ -384,12 +398,55 @@ void App::ScreenMainMenu() {
     const Rectangle clip = ToScreen(gridR);
     BeginScissorMode(static_cast<int>(clip.x), static_cast<int>(clip.y), static_cast<int>(clip.width) + 1,
                      static_cast<int>(clip.height) + 1);
-    ModeId clicked = ModeId::Count;
+    int clicked = -1;
     for (size_t k = 0; k < shown.size(); ++k) {
-        const ModeId m = shown[k];
+        const int entry = shown[k];
         const float cx = x0 + static_cast<float>(k % 3) * (cw + gap);
         const float cy = gridR.y + static_cast<float>(k / 3) * (ch + gap) - menuScroll_;
         if (cy + ch < gridR.y || cy > gridR.y + gridR.height) continue;
+        const Rectangle cr = {cx, cy, cw, ch};
+        if (entry == kWarmupEntry || entry == kImproveEntry) {
+            const bool warm = entry == kWarmupEntry;
+            std::string line1, line2;
+            if (warm) {
+                int secs = 0;
+                const std::vector<PlanStep> w = BuildWarmup();
+                for (const PlanStep& st : w) secs += st.seconds;
+                line1 = TextFormat("%d tasks  |  ~%.1f min", static_cast<int>(w.size()), secs / 60.0);
+                line2 = "Play it before ranked";
+            } else {
+                const Diagnosis d = Diagnose(stats_);
+                int weakest = -1;
+                for (int i = 0; i < kSkillCount; ++i) {
+                    if (d.skills[i].points >= 0.0 && (weakest < 0 || d.skills[i].points < d.skills[weakest].points)) weakest = i;
+                }
+                line1 = weakest >= 0 ? std::string("Focus: ") + SkillName(static_cast<Skill>(weakest)) : "First plan: skill test";
+                line2 = "Adapts to your results";
+            }
+            if (Card(cr, ModeId::Count, warm ? "Warmup" : "Improve My Aim",
+                     warm ? "Seven short tasks: big targets, tracking, flicks, micro-adjustments, heads and reaction."
+                          : "Finds your weak spots from your runs and builds tasks for them. Harder as you improve.",
+                     line1, line2) &&
+                Hover(gridR)) {
+                clicked = entry;
+            }
+            // Plan icon (the card's corner): a checklist / a rising graph.
+            const Rectangle sr = {cr.x + cr.width - 64.0f, cr.y + 18.0f, 44.0f, 44.0f};
+            if (warm) {
+                for (int i = 0; i < 3; ++i) {
+                    const float y = sr.y + 6.0f + static_cast<float>(i) * 13.0f;
+                    Fill(Rectangle{sr.x + 2.0f, y, 8.0f, 8.0f}, i < 2 ? theme::kGood : Alpha(theme::kTextDim, 0.6f));
+                    Fill(Rectangle{sr.x + 16.0f, y + 2.0f, 26.0f, 4.0f}, Alpha(theme::kTextDim, 0.8f));
+                }
+            } else {
+                const Vector2 pts[4] = {{sr.x + 2.0f, sr.y + 38.0f}, {sr.x + 15.0f, sr.y + 26.0f}, {sr.x + 26.0f, sr.y + 31.0f},
+                                        {sr.x + 42.0f, sr.y + 8.0f}};
+                for (int i = 0; i < 3; ++i) Line(pts[i], pts[i + 1], 3.0f, theme::kAccent);
+                Circle(pts[3], 4.0f, theme::kAccent);
+            }
+            continue;
+        }
+        const ModeId m = static_cast<ModeId>(entry);
         long long best = 0;
         std::string line1, line2;
         if (m == ModeId::VsBot) {
@@ -410,7 +467,7 @@ void App::ScreenMainMenu() {
             if (m == ModeId::Sniper) line2 += std::string("  |  ") + SniperName(static_cast<SniperWeapon>(cfg_.sniperWeapon));
         }
         const std::string title = m == ModeId::Placement ? "Placement" : ModeName(m);
-        if (Card(Rectangle{cx, cy, cw, ch}, m, title, ModeDescription(m), line1, line2) && Hover(gridR)) clicked = m;
+        if (Card(cr, m, title, ModeDescription(m), line1, line2) && Hover(gridR)) clicked = entry;
     }
     EndScissorMode();
     if (shown.empty()) {
@@ -423,12 +480,11 @@ void App::ScreenMainMenu() {
         Fill(Rectangle{gridR.x + gridR.width + 6.0f, gridR.y, 4.0f, gridR.height}, Alpha(theme::kLine, 0.6f));
         Fill(Rectangle{gridR.x + gridR.width + 6.0f, barY, 4.0f, barH}, theme::kAccent);
     }
-    if (clicked != ModeId::Count) {
-        ClearFocus();
-        OpenModeSetup(clicked);
+    if (clicked >= 0) {
+        open(clicked);
         return;
     }
-    Text(TextFormat("%d modes  |  scroll for more  |  Esc pause  |  %s restart  |  %s FPS counter", static_cast<int>(shown.size()),
+    Text(TextFormat("%d entries  |  scroll for more  |  Esc pause  |  %s restart  |  %s FPS counter", static_cast<int>(shown.size()),
                     input::BindName(cfg_.keys.restart).c_str(), input::BindName(cfg_.keys.toggleFps).c_str()),
          x0, gridR.y + gridR.height + 10.0f, 18.0f, theme::kTextDim);
 
@@ -1640,4 +1696,231 @@ void App::ScreenBotSelect() {
         screen_ = Screen::MainMenu;
     }
     Text("Keys 1-9 pick a rank, Enter repeats the last one.", x0 + 290.0f, VH() - 80.0f, 18.0f, theme::kTextDim);
+}
+
+// ===========================================================================
+// Training plans: Warmup and Improve My Aim
+
+void App::OpenPlan(PlanKind kind) {
+    planKind_ = kind;
+    planBefore_ = Diagnose(stats_);
+    plan_ = kind == PlanKind::Warmup ? BuildWarmup() : BuildImprovePlan(planBefore_, stats_, rng_);
+    screen_ = Screen::PlanIntro;
+}
+
+void App::StartPlanStep() {
+    if (planIndex_ >= plan_.size()) return;
+    planActive_ = true;
+    StartRun(plan_[planIndex_].mode, false);
+}
+
+namespace {
+
+// One row of a plan: number, icon, mode, difficulty / length, reason.
+void PlanRow(Rectangle r, int index, const PlanStep& st, bool done, bool current) {
+    Angled(r, current ? theme::kPanel2 : theme::kPanel, 10.0f);
+    if (current) Fill(Rectangle{r.x, r.y, 4.0f, r.height - 10.0f}, theme::kAccent);
+    Text(TextFormat("%d", index + 1), r.x + 20.0f, r.y + 18.0f, 22.0f, done ? theme::kGood : theme::kTextDim);
+    DrawModeIcon(st.mode, r.x + 74.0f, r.y + r.height * 0.5f, 34.0f, done ? Alpha(theme::kTextDim, 0.6f) : theme::kText);
+    TextBold(ModeName(st.mode), r.x + 110.0f, r.y + 8.0f, 20.0f, done ? theme::kTextDim : theme::kText);
+    Text(TextFormat("%s  |  %d s", DifficultyName(st.difficulty), st.seconds), r.x + r.width - 16.0f, r.y + 10.0f, 16.0f,
+         theme::kTextDim, Align::Right);
+    Text(st.why, r.x + 110.0f, r.y + 34.0f, 15.0f, Alpha(theme::kTextDim, 0.95f));
+    if (done) Text("DONE", r.x + r.width - 16.0f, r.y + 34.0f, 15.0f, theme::kGood, Align::Right);
+}
+
+// Skill bar: name, badge and rank (or "not tested").
+void SkillRow(Rectangle r, Skill sk, const SkillScore& sc, const SkillScore* before) {
+    Angled(r, theme::kPanel, 10.0f);
+    Text(SkillName(sk), r.x + 16.0f, r.y + 10.0f, 19.0f, theme::kText);
+    if (sc.points < 0.0) {
+        Text("not tested yet", r.x + r.width - 16.0f, r.y + 12.0f, 16.0f, theme::kTextDim, Align::Right);
+        return;
+    }
+    const AimRank rk = RankFromPoints(sc.points);
+    const Rectangle bar = {r.x + 16.0f, r.y + r.height - 16.0f, r.width - 32.0f, 6.0f};
+    Fill(bar, theme::kBg);
+    Fill(Rectangle{bar.x, bar.y, bar.width * static_cast<float>(std::min(1.0, sc.points / kRadiantPoints)), bar.height},
+         TierColor(rk.tier));
+    std::string label = RankLabel(rk);
+    if (before && before->points >= 0.0) {
+        const double delta = sc.points - before->points;
+        if (std::fabs(delta) >= 0.05) label += TextFormat("   (%+.1f)", delta);
+    } else if (before) {
+        label += "   (new)";
+    }
+    Text(label, r.x + r.width - 16.0f, r.y + 10.0f, 17.0f, TierColor(rk.tier), Align::Right);
+}
+
+}  // namespace
+
+void App::ScreenPlanIntro() {
+    const float x0 = ContentX();
+    const bool improve = planKind_ == PlanKind::Improve;
+    Title(improve ? "IMPROVE MY AIM" : "WARMUP", x0, 50.0f, 52.0f);
+    int total = 0;
+    for (const PlanStep& st : plan_) total += st.seconds;
+    Text(TextFormat("%d tasks  |  about %.0f minutes  |  tasks run back to back, Esc pauses", static_cast<int>(plan_.size()),
+                    std::ceil(total / 60.0 + static_cast<double>(plan_.size()) * 0.1)),
+         x0 + 6.0f, 124.0f, 20.0f, theme::kAccent);
+
+    // Left: what the coach found (or what the warmup does).
+    const float lw = 520.0f;
+    float y = 170.0f;
+    if (improve) {
+        Text("YOUR SKILLS (recent ranked runs)", x0, y, 18.0f, theme::kTextDim);
+        y += 28.0f;
+        for (int i = 0; i < kSkillCount; ++i) {
+            SkillRow(Rectangle{x0, y, lw, 60.0f}, static_cast<Skill>(i), planBefore_.skills[i], nullptr);
+            y += 68.0f;
+        }
+        y += 8.0f;
+        Text("WHAT THE COACH SEES", x0, y, 18.0f, theme::kTextDim);
+        y += 28.0f;
+        if (planBefore_.findings.empty()) {
+            y += TextBlock("Not enough runs yet - this plan tests every skill first.", x0, y, lw, 18.0f, theme::kText);
+        }
+        for (const std::string& f : planBefore_.findings) {
+            Fill(Rectangle{x0, y + 8.0f, 7.0f, 7.0f}, theme::kAccent);
+            y += TextBlock(f, x0 + 18.0f, y, lw - 18.0f, 18.0f, theme::kText) + 8.0f;
+        }
+    } else {
+        y += TextBlock("A short routine that gets you ready to play: big easy targets first, then smooth tracking, "
+                       "flicks with clean stops, micro-adjustments, one-tap heads and reaction. Play it before ranked or "
+                       "whenever your aim feels cold.",
+                       x0, y, lw, 20.0f, theme::kText);
+        y += 16.0f;
+        TextBlock("Each task is saved like a normal run, so your stats and ranks keep updating.", x0, y, lw, 18.0f,
+                  theme::kTextDim);
+    }
+
+    // Right: the tasks.
+    const float rx = x0 + lw + 40.0f, rw = kContentWidth - lw - 40.0f;
+    Text("TASKS", rx, 170.0f, 18.0f, theme::kTextDim);
+    for (size_t i = 0; i < plan_.size(); ++i) {
+        PlanRow(Rectangle{rx, 198.0f + static_cast<float>(i) * 70.0f, rw, 62.0f}, static_cast<int>(i), plan_[i], false, i == 0);
+    }
+
+    if (Button(Rectangle{x0, VH() - 100.0f, 300.0f, 60.0f}, improve ? "START PLAN" : "START WARMUP", true) ||
+        IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER)) {
+        planIndex_ = 0;
+        planResults_.clear();
+        planRanks_.clear();
+        planRanked_.clear();
+        planTips_.clear();
+        StartPlanStep();
+        return;
+    }
+    if (Button(Rectangle{x0 + 320.0f, VH() - 100.0f, 220.0f, 60.0f}, "BACK") || IsKeyPressed(KEY_ESCAPE)) {
+        screen_ = Screen::MainMenu;
+    }
+    if (improve) {
+        Text("Every task's difficulty follows your rank in that mode, and the next plan is built from these results.",
+             x0 + 570.0f, VH() - 80.0f, 17.0f, theme::kTextDim);
+    }
+}
+
+void App::ScreenPlanNext() {
+    const float x0 = ContentX();
+    if (planResults_.empty() || planIndex_ + 1 >= plan_.size()) {
+        screen_ = Screen::MainMenu;
+        return;
+    }
+    const RunStats& s = planResults_.back();
+    const PlanStep& done = plan_[planIndex_];
+    const PlanStep& next = plan_[planIndex_ + 1];
+    Title(TextFormat("TASK %d / %d DONE", static_cast<int>(planIndex_ + 1), static_cast<int>(plan_.size())), x0, 50.0f, 52.0f);
+    Text(std::string(ModeName(done.mode)) + "  (" + DifficultyName(done.difficulty) + ")", x0 + 6.0f, 124.0f, 22.0f,
+         theme::kAccent);
+
+    const float tw = (kContentWidth - 30.0f) / 4.0f;
+    StatTile(Rectangle{x0, 170.0f, tw, 100.0f}, "SCORE", std::to_string(std::max<long long>(0, s.score)), theme::kAccent);
+    StatTile(Rectangle{x0 + tw + 10.0f, 170.0f, tw, 100.0f}, IsTrackingMode(s.mode) ? "ON TARGET WHILE FIRING" : "ACCURACY",
+             Fmt(s.Accuracy() * 100.0, 1) + "%", theme::kAccent);
+    StatTile(Rectangle{x0 + 2.0f * (tw + 10.0f), 170.0f, tw, 100.0f}, "AVG REACTION / TTK",
+             MsOrDash(s.AvgReactionMs() > 0.0 ? s.AvgReactionMs() : s.AvgTtkMs()), theme::kText);
+    StatTile(Rectangle{x0 + 3.0f * (tw + 10.0f), 170.0f, tw, 100.0f}, "THIS RUN",
+             planRanked_.back() ? RankLabel(planRanks_.back()) : "-", planRanked_.back() ? TierColor(planRanks_.back().tier) : theme::kText);
+    if (!planTips_.back().empty()) {
+        Fill(Rectangle{x0, 300.0f, 8.0f, 8.0f}, theme::kAccent);
+        TextBlock(planTips_.back(), x0 + 20.0f, 292.0f, kContentWidth - 20.0f, 20.0f, theme::kText);
+    }
+
+    Text("NEXT", x0, 380.0f, 18.0f, theme::kTextDim);
+    PlanRow(Rectangle{x0, 408.0f, kContentWidth, 62.0f}, static_cast<int>(planIndex_ + 1), next, false, true);
+    for (size_t i = planIndex_ + 2; i < plan_.size() && i < planIndex_ + 5; ++i) {
+        PlanRow(Rectangle{x0, 408.0f + static_cast<float>(i - planIndex_ - 1) * 70.0f, kContentWidth, 62.0f}, static_cast<int>(i),
+                plan_[i], false, false);
+    }
+
+    // The countdown waits while you are tabbed out.
+    if (!platform::HasFocus()) planNextAt_ = std::max(planNextAt_, platform::Now() + 5.0);
+    const double left = planNextAt_ - platform::Now();
+    const bool go = left <= 0.0;
+    if (Button(Rectangle{x0, VH() - 100.0f, 340.0f, 60.0f}, TextFormat("CONTINUE  (%d)", std::max(0, static_cast<int>(std::ceil(left)))),
+               true) ||
+        go || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE)) {
+        ++planIndex_;
+        StartPlanStep();
+        return;
+    }
+    if (Button(Rectangle{x0 + 360.0f, VH() - 100.0f, 240.0f, 60.0f}, "QUIT PLAN") || IsKeyPressed(KEY_ESCAPE)) {
+        planActive_ = false;
+        screen_ = Screen::MainMenu;
+    }
+    Text("Enter / Space to continue now", x0 + 620.0f, VH() - 80.0f, 18.0f, theme::kTextDim);
+}
+
+void App::ScreenPlanDone() {
+    const float x0 = ContentX();
+    const bool improve = planKind_ == PlanKind::Improve;
+    Title(improve ? "PLAN COMPLETE" : "WARMUP COMPLETE", x0, 50.0f, 52.0f);
+    Text(improve ? "Here's what changed. Your next plan is built from these results." : "You're warmed up. Go get them.",
+         x0 + 6.0f, 124.0f, 20.0f, theme::kAccent);
+
+    // Left: every task's result.
+    const float lw = improve ? 700.0f : kContentWidth;
+    Text("SCORE", x0 + lw * 0.52f, 170.0f, 15.0f, theme::kTextDim, Align::Right);
+    Text("ACCURACY", x0 + lw * 0.68f, 170.0f, 15.0f, theme::kTextDim, Align::Right);
+    Text("RUN RANK", x0 + lw - 16.0f, 170.0f, 15.0f, theme::kTextDim, Align::Right);
+    float y = 194.0f;
+    for (size_t i = 0; i < planResults_.size() && i < plan_.size(); ++i) {
+        const RunStats& s = planResults_[i];
+        const Rectangle r = {x0, y, lw, 54.0f};
+        Angled(r, theme::kPanel, 10.0f);
+        DrawModeIcon(plan_[i].mode, r.x + 34.0f, r.y + 27.0f, 30.0f, theme::kText);
+        TextBold(ModeName(plan_[i].mode), r.x + 66.0f, r.y + 8.0f, 19.0f, theme::kText);
+        Text(DifficultyName(plan_[i].difficulty), r.x + 66.0f, r.y + 31.0f, 14.0f, theme::kTextDim);
+        Text(TextFormat("%lld", std::max<long long>(0, s.score)), r.x + lw * 0.52f, r.y + 16.0f, 20.0f, theme::kText, Align::Right);
+        Text(Fmt(s.Accuracy() * 100.0, 0) + "%", r.x + lw * 0.68f, r.y + 16.0f, 20.0f, theme::kTextDim, Align::Right);
+        if (i < planRanked_.size() && planRanked_[i]) {
+            Text(RankLabel(planRanks_[i]), r.x + lw - 16.0f, r.y + 16.0f, 20.0f, TierColor(planRanks_[i].tier), Align::Right);
+        }
+        y += 60.0f;
+    }
+
+    // Right: skills before -> after, and what comes next.
+    if (improve) {
+        const float rx = x0 + lw + 30.0f, rw = kContentWidth - lw - 30.0f;
+        float ry = 194.0f;
+        Text("SKILLS  (change this plan)", rx, 170.0f, 15.0f, theme::kTextDim);
+        for (int i = 0; i < kSkillCount; ++i) {
+            SkillRow(Rectangle{rx, ry, rw, 60.0f}, static_cast<Skill>(i), planAfter_.skills[i], &planBefore_.skills[i]);
+            ry += 68.0f;
+        }
+        ry += 10.0f;
+        if (!planAfter_.findings.empty()) {
+            Text("NEXT PLAN FOCUS", rx, ry, 18.0f, theme::kTextDim);
+            TextBlock(planAfter_.findings.front(), rx, ry + 26.0f, rw, 18.0f, theme::kText);
+        }
+    }
+
+    if (Button(Rectangle{x0, VH() - 100.0f, 300.0f, 60.0f}, improve ? "NEXT PLAN" : "WARMUP AGAIN", true)) {
+        OpenPlan(planKind_);
+        return;
+    }
+    if (Button(Rectangle{x0 + 320.0f, VH() - 100.0f, 240.0f, 60.0f}, "MAIN MENU") || IsKeyPressed(KEY_ESCAPE) ||
+        IsKeyPressed(KEY_ENTER)) {
+        screen_ = Screen::MainMenu;
+    }
 }

@@ -261,6 +261,9 @@ void App::Frame() {
         case Screen::Difficulty: ui::Backdrop(); ScreenDifficulty(); break;
         case Screen::SniperSelect: ui::Backdrop(); ScreenSniperSelect(); break;
         case Screen::BotSelect: ui::Backdrop(); ScreenBotSelect(); break;
+        case Screen::PlanIntro: ui::Backdrop(); ScreenPlanIntro(); break;
+        case Screen::PlanNext: ui::Backdrop(); ScreenPlanNext(); break;
+        case Screen::PlanDone: ui::Backdrop(); ScreenPlanDone(); break;
     }
     if (screen_ != Screen::Playing) DrawFpsCounter();
 
@@ -326,6 +329,7 @@ void App::StartRun(ModeId id, bool finderTest) {
     ctx.brightness = cfg_.mapBrightness;
     // The sens finder test always runs at Normal so its scores are comparable.
     ctx.difficulty = finderTest ? ::Difficulty::Normal : currentDifficulty_;
+    if (planActive_ && planIndex_ < plan_.size()) ctx.difficulty = plan_[planIndex_].difficulty;
     ctx.diff = GetDifficulty(ctx.difficulty);
     ctx.weapon = static_cast<SniperWeapon>(cfg_.sniperWeapon);
     ctx.scopeBind = cfg_.keys.scope;
@@ -358,6 +362,7 @@ void App::StartRun(ModeId id, bool finderTest) {
     paused_ = false;
     runLength_ = finderTest ? SensFinder::kTestSeconds : static_cast<double>(cfg_.runSeconds);
     if (id == ModeId::VsBot) runLength_ = 3600.0;  // the match ends itself (first to 5 rounds)
+    if (planActive_ && planIndex_ < plan_.size()) runLength_ = static_cast<double>(plan_[planIndex_].seconds);
     screen_ = Screen::Playing;
     ui::ClearFocus();
 }
@@ -400,6 +405,22 @@ void App::EndRun() {
         SetSens(cfg_.sens * (1.0 + pct / 100.0));
         autoSensApplied_ = std::fabs(cfg_.sens - autoSensBefore_) > 1e-9;
     }
+    if (planActive_) {
+        // Training plan: short result between tasks, summary at the end.
+        planResults_.push_back(s);
+        planRanks_.push_back(lastRunRank_);
+        planRanked_.push_back(lastRunRanked_);
+        planTips_.push_back(lastTips_.empty() ? std::string() : lastTips_.front());
+        if (planIndex_ + 1 < plan_.size()) {
+            screen_ = Screen::PlanNext;
+            planNextAt_ = platform::Now() + 12.0;
+        } else {
+            planActive_ = false;
+            planAfter_ = Diagnose(stats_);
+            screen_ = Screen::PlanDone;
+        }
+        return;
+    }
     screen_ = Screen::Results;
 }
 
@@ -407,6 +428,11 @@ void App::AbortRun() {
     mode_.reset();
     live_ = false;
     paused_ = false;
+    if (planActive_) {
+        planActive_ = false;
+        screen_ = Screen::MainMenu;
+        return;
+    }
     if (finderRun_) {
         finderRun_ = false;
         finder_.Cancel();

@@ -9,6 +9,7 @@
 #include "sens_finder.h"
 #include "rank.h"
 #include "stats.h"
+#include "training.h"
 
 namespace {
 
@@ -284,6 +285,27 @@ bool RunSelfTest(std::string& report) {
                DecodeCrosshair(EncodeCrosshair(w), w2, &err) && w2.innerSeparateVert && w2.innerVertLength == 9 &&
                    w2.overrideFiringOffset && w2.innerFiringError == w.innerFiringError && w2.fadeWithFiring == w.fadeWithFiring);
         c.True("valorant code rejects missing P section", !DecodeValorantCrosshair("0;A;c;1", v, &err));
+    }
+
+    {
+        // Training plans.
+        const std::vector<PlanStep> warm = BuildWarmup();
+        int warmSec = 0;
+        for (const PlanStep& st : warm) warmSec += st.seconds;
+        c.True("warmup: 7 ranked-length tasks, about 4-6 minutes", warm.size() == 7 && warmSec >= 240 && warmSec <= 360);
+        StatsStore empty;
+        const Diagnosis d = Diagnose(empty);
+        bool allUntested = true;
+        for (const SkillScore& sk : d.skills) allUntested = allUntested && sk.points < 0.0;
+        c.True("coach: no runs = every skill untested", allUntested && d.clickAccuracy < 0.0 && d.overshootShare < 0.0);
+        Rng rng(7);
+        const std::vector<PlanStep> plan = BuildImprovePlan(d, empty, rng);
+        bool unique = true, longEnough = true;
+        for (size_t i = 0; i < plan.size(); ++i) {
+            longEnough = longEnough && plan[i].seconds >= static_cast<int>(kMinRankedSeconds);
+            for (size_t j = i + 1; j < plan.size(); ++j) unique = unique && plan[i].mode != plan[j].mode;
+        }
+        c.True("coach: first plan tests skills, 5-7 unique ranked tasks", plan.size() >= 5 && plan.size() <= 7 && unique && longEnough);
     }
 
     char summary[96];

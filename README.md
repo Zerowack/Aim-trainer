@@ -187,6 +187,20 @@ immediately. While paused or in the background the app drops to 60 FPS so other 
 To minimize in any display mode, click Valtrainer's taskbar button, press Win+Down, or use
 **MINIMIZE** on the main menu or in the pause menu.
 
+**Training plans** (the first two cards on the main menu, or the **Plans** filter):
+
+- **Warmup**: seven short tasks in a row (about 4.5 minutes): easy Gridshot, Smooth Tracking,
+  Spidershot, Microflex, Strafe Tap, Headshot and Reaction. Play it before ranked.
+- **Improve My Aim**: a coach that reads your saved runs. It scores five skills (Flicking, Precision,
+  Tracking, Reaction, Crosshair placement) from your recent ranked runs, finds the weakest ones and
+  your habits (overshooting, undershooting, low accuracy), and builds 5–7 tasks for them. Untested
+  skills get a test first. Each task's difficulty follows your rank in that mode, so plans get harder as
+  you get better. The summary shows how each skill changed, and the next plan is built from the new
+  results.
+
+Between tasks you see a short result and the next task. It continues on its own after 12 s, or press
+Enter/Space. Esc quits the plan. Every task is saved as a normal run.
+
 **Modes** (60 s by default, adjustable in Settings → Gameplay, with a 3 s countdown):
 
 1. **Gridshot**: 3 body-sized targets on a grid 10 m away. Destroy one and a new one spawns.
@@ -392,6 +406,7 @@ Copy the new value into Valorant to keep both games the same. Everything is appe
 | `src/vsbot.cpp` | VS Bot: rifle, arena and bot AI per rank |
 | `src/sniper.cpp` | Sniper: the angle-holding lane, peek types, enemy return fire |
 | `src/modes_extra.cpp` | Headshot, Sixshot, Spidershot, Motionshot, Smooth Tracking, Strafe Tap, Target Switch, Long Range, Microflex, Popcorn |
+| `src/training.h`, `src/training.cpp` | Warmup routine and the Improve My Aim coach (skill diagnosis, adaptive plans) |
 | `src/movement.h`, `src/movement.cpp` | Valorant-style movement shared by VS Bot and Sniper (run, walk, crouch, jump, counter-strafe) |
 | `src/sens_finder.h`, `src/sens_finder.cpp` | PSA logic, scoring, session storage and averaging |
 | `src/stats.h`, `src/stats.cpp` | run statistics, coaching tips, `stats.csv` |

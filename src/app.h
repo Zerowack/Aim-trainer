@@ -15,9 +15,10 @@
 #include "rng.h"
 #include "sens_finder.h"
 #include "stats.h"
+#include "training.h"
 #include "world.h"
 
-constexpr const char* kAppVersion = "2.1.1";
+constexpr const char* kAppVersion = "2.2.0";
 
 // Game clock = real time minus all time spent paused.
 struct GameClock {
@@ -54,7 +55,10 @@ enum class Screen {
     Rank,
     Difficulty,
     SniperSelect,
-    BotSelect
+    BotSelect,
+    PlanIntro,   // warmup / improve plan overview
+    PlanNext,    // between two plan tasks
+    PlanDone     // plan summary
 };
 
 class App {
@@ -108,6 +112,12 @@ private:
     void ScreenDifficulty();
     void ScreenSniperSelect();
     void ScreenBotSelect();
+    void ScreenPlanIntro();
+    void ScreenPlanNext();
+    void ScreenPlanDone();
+    // Builds a warmup / improve plan and shows its overview.
+    void OpenPlan(PlanKind kind);
+    void StartPlanStep();
     // Opens the right picker for a mode (rifle / bot rank / difficulty).
     void OpenModeSetup(ModeId mode);
     // Opens the difficulty picker for a mode (then starts the run).
@@ -184,6 +194,19 @@ private:
     std::string modeSearch_;         // main menu mode browser
     int modeCategory_ = -1;          // -1 = all
     float menuScroll_ = 0.0f;
+
+    // --- training plans (warmup / improve my aim)
+    PlanKind planKind_ = PlanKind::Warmup;
+    std::vector<PlanStep> plan_;
+    size_t planIndex_ = 0;
+    bool planActive_ = false;
+    std::vector<RunStats> planResults_;
+    std::vector<AimRank> planRanks_;
+    std::vector<bool> planRanked_;
+    std::vector<std::string> planTips_;
+    Diagnosis planBefore_;
+    Diagnosis planAfter_;
+    double planNextAt_ = 0.0;
 
     // --- performance display / frame pacing
     double lastFrameTime_ = 0.0;

@@ -83,6 +83,7 @@ add_executable(Valtrainer WIN32
     src/movement.cpp
     src/sniper.cpp
     src/modes_extra.cpp
+    src/training.cpp
     src/platform.h
     src/platform_win32.cpp
     src/rank.cpp
@@ -140,5 +141,6 @@ add_executable(ValtrainerSelfTest
     src/rank.cpp
     src/sens_finder.cpp
     src/stats.cpp
+    src/training.cpp
 )
 valtrainer_setup(ValtrainerSelfTest)
