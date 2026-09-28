@@ -124,24 +124,31 @@ bool Invert(std::vector<std::vector<double>> m, std::vector<std::vector<double>>
 
 }  // namespace
 
-void SensFinder::Start(double currentSens, double dpi, unsigned int seed) {
+void SensFinder::ScanRange(double userSens, double dpi, double& lo, double& hi) {
+    const double pro = ProSens(dpi);
+    lo = std::min(pro * 0.55, userSens * 0.8);
+    hi = std::max(pro * 1.8, userSens * 1.25);
+}
+
+void SensFinder::Start(double userSens, double dpi, unsigned int seed) {
     active_ = true;
     finished_ = false;
-    startSens_ = currentSens;
+    startSens_ = userSens;
+    baseSens_ = ProSens(dpi);
     dpi_ = dpi;
     rng_ = seed * 2654435761u + 12345u;
     if (rng_ == 0) rng_ = 1;
     tests_.clear();
     fit_ = FinderFit{};
 
-    // Warm-up at the current sens, then the scan in random order.
+    // Warm-up at your own sens, then the scan (around the pro average) in random order.
     plan_.clear();
-    plan_.push_back(currentSens);
+    plan_.push_back(userSens);
     std::vector<double> scan;
-    const double lo = std::log(0.55), hi = std::log(1.8);
-    for (int i = 0; i < kScanTests; ++i) {
-        scan.push_back(currentSens * std::exp(lo + (hi - lo) * i / (kScanTests - 1)));
-    }
+    double sLo = 0.0, sHi = 0.0;
+    ScanRange(userSens, dpi, sLo, sHi);
+    const double lo = std::log(sLo), hi = std::log(sHi);
+    for (int i = 0; i < kScanTests; ++i) scan.push_back(std::exp(lo + (hi - lo) * i / (kScanTests - 1)));
     Shuffle(scan);
     plan_.insert(plan_.end(), scan.begin(), scan.end());
 
@@ -192,8 +199,10 @@ void SensFinder::Submit(const RunStats& stats) {
 
 // Refine around the scan's estimate: x0.67 .. x1.5, each twice, shuffled.
 void SensFinder::PlanRefine() {
-    double centre = fit_.valid ? fit_.best : startSens_;
-    centre = std::max(startSens_ * 0.55, std::min(startSens_ * 1.8, centre));
+    double sLo = 0.0, sHi = 0.0;
+    ScanRange(startSens_, dpi_, sLo, sHi);
+    double centre = fit_.valid ? fit_.best : baseSens_;
+    centre = std::max(sLo, std::min(sHi, centre));
     std::vector<double> refine;
     const double lo = std::log(1.0 / 1.5), hi = std::log(1.5);
     for (int r = 0; r < kRefineRepeats; ++r) {
@@ -204,7 +213,7 @@ void SensFinder::PlanRefine() {
     plan_.insert(plan_.end(), refine.begin(), refine.end());
 }
 
-// Weighted least squares: score = a + b x + c x^2 (+ d t), x = ln(sens / start),
+// Weighted least squares: score = a + b x + c x^2 (+ d t), x = ln(sens / pro sens),
 // t = test order 0..1 (learning / fatigue over the session). Performance
 // flattens far from your best sens, so a parabola only fits near the peak:
 // the fit is repeated with tests weighted by their distance to the current
@@ -222,7 +231,7 @@ FinderFit SensFinder::FitTests() const {
     std::vector<double> xs(n), ts(n), ys(n);
     double xmin = 1e9, xmax = -1e9;
     for (size_t k = 0; k < n; ++k) {
-        xs[k] = std::log(used[k]->sens / startSens_);
+        xs[k] = std::log(used[k]->sens / baseSens_);
         ts[k] = n > 1 ? static_cast<double>(k) / static_cast<double>(n - 1) : 0.0;
         ys[k] = used[k]->score.total;
         xmin = std::min(xmin, xs[k]);
@@ -298,7 +307,7 @@ FinderFit SensFinder::FitTests() const {
         const double xp = -f.b / (2.0 * f.c);
         if (xp >= xmin && xp <= xmax) {
             f.peaked = true;
-            f.best = startSens_ * std::exp(xp);
+            f.best = baseSens_ * std::exp(xp);
             std::vector<std::vector<double>> inv;
             double se = 0.15;
             if (Invert(xtx, inv)) {

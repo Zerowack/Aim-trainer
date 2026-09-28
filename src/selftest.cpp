@@ -138,6 +138,15 @@ bool RunSelfTest(std::string& report) {
         }
         c.True("sens finder refines around the best area", refineAround);
     }
+    {
+        c.Near("pro base sens at 1600 DPI", SensFinder::ProSens(1600.0), 0.175, 1e-9);
+        c.Near("pro base sens at 800 DPI", SensFinder::ProSens(800.0), 0.35, 1e-9);
+        double lo = 0.0, hi = 0.0;
+        SensFinder::ScanRange(0.175, 1600.0, lo, hi);
+        c.True("scan covers x0.55-x1.8 of the pro sens", std::fabs(lo - 0.175 * 0.55) < 1e-9 && std::fabs(hi - 0.175 * 1.8) < 1e-9);
+        SensFinder::ScanRange(1.0, 800.0, lo, hi);  // 800 eDPI: far above the pro range
+        c.True("scan widens to include a high own sens", hi >= 1.25 - 1e-9 && lo <= 0.35 * 0.55 + 1e-9);
+    }
 
     // --- Combined recommendation across DPIs --------------------------------
     {

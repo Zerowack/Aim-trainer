@@ -5,7 +5,9 @@
 // adjustments) at a hidden sens:
 //   1. Warm-up: one test at your current sens (not counted).
 //   2. Scan: 7 sensitivities spread evenly (on a log scale) from x0.55 to
-//      x1.8 of your sens, in random order.
+//      x1.8 of the pro average (280 eDPI = 0.175 at 1600 DPI, converted to
+//      your DPI), widened to include your own sens if it lies outside, in
+//      random order.
 //   3. Refine: 5 sensitivities from x0.67 to x1.5 of the scan's best
 //      estimate, each played twice, in random order.
 // The recommendation is the peak of a curve fitted through every scored
@@ -61,7 +63,7 @@ struct FinderFit {
     double best = 0.0;        // recommended sens
     double low = 0.0;         // likely range (about +-1 standard error)
     double high = 0.0;
-    double a = 0.0, b = 0.0, c = 0.0;  // score = a + b x + c x^2, x = ln(sens / start), at the session's end
+    double a = 0.0, b = 0.0, c = 0.0;  // score = a + b x + c x^2, x = ln(sens / pro sens), at the session's end
 };
 
 class SensFinder {
@@ -71,15 +73,23 @@ public:
     static constexpr int kRefineRepeats = 2;
     static constexpr int kTotalTests = 1 + kScanTests + kRefineSens * kRefineRepeats;
     static constexpr double kTestSeconds = 20.0;
+    static constexpr double kProEdpi = 280.0;  // pro average: 0.175 at 1600 DPI
 
-    void Start(double currentSens, double dpi, unsigned int seed);
+    // The pro-average sens at a given DPI (the scan's centre).
+    static double ProSens(double dpi) { return dpi > 0.0 ? kProEdpi / dpi : 0.35; }
+    // Scan range for a session: x0.55 .. x1.8 of the pro sens, widened so it
+    // also covers x0.8 .. x1.25 of your own sens.
+    static void ScanRange(double userSens, double dpi, double& lo, double& hi);
+
+    void Start(double userSens, double dpi, unsigned int seed);
     bool Active() const { return active_; }
     bool Finished() const { return finished_; }
 
     int TestNumber() const { return static_cast<int>(tests_.size()) + 1; }  // 1..kTotalTests
     FinderPhase CurrentPhase() const;
     double CurrentSens() const;
-    double StartSens() const { return startSens_; }
+    double StartSens() const { return startSens_; }  // your sens when the session started
+    double BaseSens() const { return baseSens_; }    // pro average at your DPI
     double Dpi() const { return dpi_; }
 
     // Records the finished test and moves on.
@@ -101,6 +111,7 @@ private:
     bool active_ = false;
     bool finished_ = false;
     double startSens_ = 0.4;
+    double baseSens_ = 0.35;
     double dpi_ = 800.0;
     unsigned int rng_ = 1;
     std::vector<double> plan_;  // sens of every test, in play order

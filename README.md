@@ -376,7 +376,8 @@ Copy the new value into Valorant to keep both games the same. Everything is appe
 1. Every test is the same blind 20-second mix: 7 s of flicks, 7 s of tracking and 6 s of
    micro-adjustments. The sens is hidden and nothing is asked afterwards.
 2. Test 1 is a warm-up at your current sens (not scored). Tests 2-8 scan 7 sensitivities from `×0.55`
-   to `×1.8` of your sens in random order. Tests 9-18 play 5 sensitivities from `×0.67` to `×1.5` of
+   to `×1.8` of the pro average, 280 eDPI (0.175 at 1600 DPI, 0.35 at 800 DPI, always converted to your
+   DPI), in random order. If your own sens is outside that range, the scan widens to include it. Tests 9-18 play 5 sensitivities from `×0.67` to `×1.5` of
    the scan's best estimate, each twice, in random order.
 3. Each test is scored from 0 to 100 as: 30% accuracy, 25% TTK, 20% click precision (error relative to
    target size) and 25% tracking.

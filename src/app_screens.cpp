@@ -1221,14 +1221,18 @@ void App::ScreenFinderIntro() {
     Title("SENS FINDER", x0, 50.0f, 52.0f);
     TextBlock("Finds the sens you actually perform best at - no questions, no feel ratings. You play 18 short tests "
               "(20 s each: flicks, tracking and micro-adjustments) at hidden sensitivities, about 7 minutes in total. "
-              "One warm-up test at your current sens, a scan of 7 sensitivities from x0.55 to x1.8, then 10 tests "
-              "around the best area. The result is the peak of a curve fitted through all scored tests, corrected for "
+              "One warm-up test at your current sens, a scan of 7 sensitivities around the pro average (280 eDPI = "
+              "0.175 at 1600 DPI, converted to your DPI, widened to include your own sens), then 10 tests around the "
+              "best area. The result is the peak of a curve fitted through all scored tests, corrected for "
               "warming up during the session. Run it on different days: sessions are saved and averaged.",
               x0, 130.0f, 900.0f, 21.0f, theme::kTextDim);
 
-    Text("STARTING POINT", x0, 380.0f, 20.0f, theme::kAccent);
-    DrawSensSummary(x0, 410.0f, 900.0f, cfg_.dpi, cfg_.sens);
-    Text(TextFormat("Scan range: %.3f - %.3f", cfg_.sens * 0.55, cfg_.sens * 1.8), x0, 520.0f, 22.0f, theme::kText);
+    const double pro = SensFinder::ProSens(cfg_.dpi);
+    double scanLo = 0.0, scanHi = 0.0;
+    SensFinder::ScanRange(cfg_.sens, cfg_.dpi, scanLo, scanHi);
+    Text(TextFormat("STARTING POINT: PRO AVERAGE (280 eDPI) AT YOUR %.0f DPI", cfg_.dpi), x0, 380.0f, 20.0f, theme::kAccent);
+    DrawSensSummary(x0, 410.0f, 900.0f, cfg_.dpi, pro);
+    Text(TextFormat("Scan range: %.3f - %.3f  (your sens: %.3f)", scanLo, scanHi, cfg_.sens), x0, 520.0f, 22.0f, theme::kText);
 
     if (Button(Rectangle{x0, 580.0f, 380.0f, 66.0f}, "START NEW SESSION", true)) {
         finder_.Start(cfg_.sens, cfg_.dpi, static_cast<unsigned int>(rng_.Int(1, 0x7FFFFFFF)));
@@ -1325,7 +1329,7 @@ void App::ScreenFinderFinal() {
     StatTile(Rectangle{x0 + tw + 10.0f, 140.0f, tw, 100.0f}, "eDPI", Fmt(val::Edpi(dpi, rec), 0), theme::kAccent);
     StatTile(Rectangle{x0 + 2.0f * (tw + 10.0f), 140.0f, tw, 100.0f}, "CM / 360", Fmt(val::Cm360(dpi, rec), 1), theme::kAccent);
     const double change = (rec / finder_.StartSens() - 1.0) * 100.0;
-    StatTile(Rectangle{x0 + 3.0f * (tw + 10.0f), 140.0f, tw, 100.0f}, "VS START",
+    StatTile(Rectangle{x0 + 3.0f * (tw + 10.0f), 140.0f, tw, 100.0f}, "VS YOUR SENS",
              TextFormat("%+.1f%%  (was %.3f)", change, finder_.StartSens()), theme::kText);
 
     std::vector<ChartPoint> pts;
