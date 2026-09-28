@@ -18,7 +18,7 @@
 #include "training.h"
 #include "world.h"
 
-constexpr const char* kAppVersion = "2.5.1";
+constexpr const char* kAppVersion = "2.5.2";
 
 // Game clock = real time minus all time spent paused.
 struct GameClock {
@@ -74,6 +74,8 @@ private:
     std::string DataDir() const;
     double ActiveSens() const;
     void SetSens(double sens);
+    // SetSens plus a confirmation toast (Sens Finder apply buttons).
+    void ApplySens(double sens);
     void SyncSensText();
 
     // --- runs (app.cpp)
@@ -104,6 +106,7 @@ private:
     void ScreenFinderIntro();
     void ScreenFinderReady();
     void ScreenFinderFinal();
+    void DrawCombined(Rectangle r, const CombinedResult& comb);
     void ScreenRank();
     void ScreenDifficulty();
     void ScreenSniperSelect();

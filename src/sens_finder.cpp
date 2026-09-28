@@ -344,17 +344,33 @@ bool SensFinder::Save(const std::string& dir, FinderSession* outSession) const {
     s.startSens = startSens_;
     s.recommended = Recommended();
     s.cm360 = val::Cm360(dpi_, s.recommended);
+    s.reliable = fit_.peaked;
     if (outSession) *outSession = s;
 
     const std::string sessionsPath = dir + "finder_sessions.csv";
     const std::string testsPath = dir + "finder_tests_v2.csv";
 
+    static const char* const kSessionsHeader = "session_id,timestamp,dpi,start_sens,recommended_sens,cm360,edpi,peaked";
+    // Files from older versions have no 'peaked' column: update the header
+    // (old rows keep 7 fields; the loader judges those by their value).
+    {
+        std::ifstream in(sessionsPath);
+        std::string first;
+        if (in && std::getline(in, first) && first.rfind("session_id", 0) == 0 && first.find(",peaked") == std::string::npos) {
+            std::string rest, line;
+            while (std::getline(in, line)) rest += line + "\n";
+            in.close();
+            std::ofstream rw(sessionsPath, std::ios::trunc);
+            if (rw) rw << kSessionsHeader << "\n" << rest;
+        }
+    }
     const bool sessionsHeader = FileIsEmpty(sessionsPath);
     std::ofstream so(sessionsPath, std::ios::app);
     if (!so) return false;
-    if (sessionsHeader) so << "session_id,timestamp,dpi,start_sens,recommended_sens,cm360,edpi\n";
+    if (sessionsHeader) so << kSessionsHeader << "\n";
     so << s.id << ',' << s.timestamp << ',' << Fmt(s.dpi, 0) << ',' << Fmt(s.startSens, 4) << ','
-       << Fmt(s.recommended, 4) << ',' << Fmt(s.cm360, 2) << ',' << Fmt(val::Edpi(s.dpi, s.recommended), 1) << "\n";
+       << Fmt(s.recommended, 4) << ',' << Fmt(s.cm360, 2) << ',' << Fmt(val::Edpi(s.dpi, s.recommended), 1) << ','
+       << (s.reliable ? 1 : 0) << "\n";
 
     const bool testsHeader = FileIsEmpty(testsPath);
     std::ofstream to(testsPath, std::ios::app);
@@ -369,6 +385,21 @@ bool SensFinder::Save(const std::string& dir, FinderSession* outSession) const {
     }
     return static_cast<bool>(so) && static_cast<bool>(to);
 }
+
+namespace {
+
+// Old sessions (no 'peaked' column): a result on the edge of any range the
+// finder has used (x0.55 / x1.8 of the start or of the pro sens) was not a peak.
+bool LooksLikeEdge(const FinderSession& s) {
+    const double pro = SensFinder::ProSens(s.dpi);
+    const double edges[] = {s.startSens * 0.55, s.startSens * 1.8, pro * 0.55, pro * 1.8};
+    for (double e : edges) {
+        if (e > 0.0 && std::fabs(s.recommended / e - 1.0) < 0.015) return true;
+    }
+    return false;
+}
+
+}  // namespace
 
 std::vector<FinderSession> LoadFinderSessions(const std::string& dir) {
     std::vector<FinderSession> out;
@@ -386,15 +417,32 @@ std::vector<FinderSession> LoadFinderSessions(const std::string& dir) {
         s.startSens = std::strtod(f[3].c_str(), nullptr);
         s.recommended = std::strtod(f[4].c_str(), nullptr);
         s.cm360 = std::strtod(f[5].c_str(), nullptr);
+        s.reliable = f.size() >= 8 && !f[7].empty() ? f[7] != "0" : !LooksLikeEdge(s);
         if (s.dpi > 0.0 && s.recommended > 0.0) out.push_back(s);
     }
     return out;
 }
 
+CombinedResult CombineSessions(const std::vector<FinderSession>& sessions, double currentDpi) {
+    CombinedResult r;
+    if (sessions.empty() || currentDpi <= 0.0) return r;
+    std::vector<double> reliable, all;
+    for (const FinderSession& s : sessions) {
+        const double cm = val::Cm360(s.dpi, s.recommended);
+        all.push_back(cm);
+        if (s.reliable) reliable.push_back(cm);
+    }
+    std::vector<double>& use = reliable.empty() ? all : reliable;
+    r.used = static_cast<int>(use.size());
+    r.leftOut = static_cast<int>(all.size() - use.size());
+    std::sort(use.begin(), use.end());
+    const size_t n = use.size();
+    const double median = n % 2 == 1 ? use[n / 2] : 0.5 * (use[n / 2 - 1] + use[n / 2]);
+    r.spreadPct = (use.back() / use.front() - 1.0) * 100.0;
+    r.sens = val::SensFromCm360(currentDpi, median);
+    return r;
+}
+
 double CombinedRecommendation(const std::vector<FinderSession>& sessions, double currentDpi) {
-    if (sessions.empty() || currentDpi <= 0.0) return 0.0;
-    double sumCm = 0.0;
-    for (const FinderSession& s : sessions) sumCm += val::Cm360(s.dpi, s.recommended);
-    const double avgCm = sumCm / static_cast<double>(sessions.size());
-    return val::SensFromCm360(currentDpi, avgCm);
+    return CombineSessions(sessions, currentDpi).sens;
 }

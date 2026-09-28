@@ -1216,6 +1216,31 @@ void App::ScreenStats() {
 // ===========================================================================
 // Sens finder
 
+// Combined result of the saved sessions: median value, what was left out,
+// a warning when sessions disagree, and the apply button.
+void App::DrawCombined(Rectangle r, const CombinedResult& comb) {
+    const float x = r.x + 24.0f, w = r.width - 48.0f;
+    float y = r.y;
+    std::string head = TextFormat("COMBINED: median of %d session%s", comb.used, comb.used == 1 ? "" : "s");
+    if (comb.leftOut > 0) head += TextFormat(" (%d edge result%s left out)", comb.leftOut, comb.leftOut == 1 ? "" : "s");
+    Text(head, x, y, 17.0f, theme::kTextDim);
+    Text(TextFormat("%.3f", comb.sens), x, y + 24.0f, 48.0f, theme::kText);
+    Text(TextFormat("eDPI %.0f  |  %.1f cm/360", val::Edpi(cfg_.dpi, comb.sens), val::Cm360(cfg_.dpi, comb.sens)), x, y + 82.0f,
+         18.0f, theme::kTextDim);
+    y += 112.0f;
+    if (comb.Disagree()) {
+        y += TextBlock(TextFormat("Your sessions disagree by %.0f%%: run the finder again on another day before trusting this.",
+                                  comb.spreadPct),
+                       x, y, w, 17.0f, theme::kWarn) + 6.0f;
+    } else if (comb.used < 2) {
+        y += TextBlock("One session so far. Run it again on another day to confirm.", x, y, w, 17.0f, theme::kTextDim) + 6.0f;
+    }
+    const bool applied = std::fabs(cfg_.sens - std::round(comb.sens * 1000.0) / 1000.0) < 5e-4;
+    if (Button(Rectangle{x, r.y + r.height - 76.0f, w, 56.0f}, applied ? "APPLIED" : "APPLY COMBINED", false, !applied)) {
+        ApplySens(comb.sens);
+    }
+}
+
 void App::ScreenFinderIntro() {
     const float x0 = ContentX();
     Title("SENS FINDER", x0, 50.0f, 52.0f);
@@ -1230,9 +1255,11 @@ void App::ScreenFinderIntro() {
     const double pro = SensFinder::ProSens(cfg_.dpi);
     double scanLo = 0.0, scanHi = 0.0;
     SensFinder::ScanRange(cfg_.sens, cfg_.dpi, scanLo, scanHi);
-    Text(TextFormat("STARTING POINT: PRO AVERAGE (280 eDPI) AT YOUR %.0f DPI", cfg_.dpi), x0, 380.0f, 20.0f, theme::kAccent);
-    DrawSensSummary(x0, 410.0f, 900.0f, cfg_.dpi, pro);
-    Text(TextFormat("Scan range: %.3f - %.3f  (your sens: %.3f)", scanLo, scanHi, cfg_.sens), x0, 520.0f, 22.0f, theme::kText);
+    Text("YOUR CURRENT SENS", x0, 380.0f, 20.0f, theme::kAccent);
+    DrawSensSummary(x0, 410.0f, 900.0f, cfg_.dpi, cfg_.sens);
+    Text(TextFormat("Scan starts at the pro average: %.3f (280 eDPI at %.0f DPI)  |  range %.3f - %.3f", pro, cfg_.dpi, scanLo,
+                    scanHi),
+         x0, 520.0f, 20.0f, theme::kText);
 
     if (Button(Rectangle{x0, 580.0f, 380.0f, 66.0f}, "START NEW SESSION", true)) {
         finder_.Start(cfg_.sens, cfg_.dpi, static_cast<unsigned int>(rng_.Int(1, 0x7FFFFFFF)));
@@ -1247,23 +1274,17 @@ void App::ScreenFinderIntro() {
     Text("SAVED SESSIONS", rx + 24.0f, 150.0f, 20.0f, theme::kAccent);
     float sy = 186.0f;
     int shown = 0;
-    for (auto it = finderSessions_.rbegin(); it != finderSessions_.rend() && shown < 8; ++it, ++shown) {
+    for (auto it = finderSessions_.rbegin(); it != finderSessions_.rend() && shown < 7; ++it, ++shown) {
         Text(TextFormat("%s   %.3f @ %.0f DPI   %.1f cm", it->timestamp.substr(0, 10).c_str(), it->recommended, it->dpi,
                         val::Cm360(it->dpi, it->recommended)),
-             rx + 24.0f, sy, 18.0f, theme::kText);
+             rx + 24.0f, sy, 18.0f, it->reliable ? theme::kText : theme::kTextDim);
+        if (!it->reliable) Text("EDGE", rx + rw - 24.0f, sy, 16.0f, theme::kWarn, Align::Right);
         sy += 28.0f;
     }
     if (finderSessions_.empty()) Text("No sessions yet.", rx + 24.0f, sy, 18.0f, theme::kTextDim);
 
-    const double combined = CombinedRecommendation(finderSessions_, cfg_.dpi);
-    if (combined > 0.0) {
-        Text(TextFormat("COMBINED (%d sessions, averaged in cm/360)", static_cast<int>(finderSessions_.size())), rx + 24.0f,
-             440.0f, 18.0f, theme::kTextDim);
-        Text(TextFormat("%.3f", combined), rx + 24.0f, 466.0f, 48.0f, theme::kText);
-        Text(TextFormat("eDPI %.0f  |  %.1f cm/360", val::Edpi(cfg_.dpi, combined), val::Cm360(cfg_.dpi, combined)),
-             rx + 24.0f, 524.0f, 20.0f, theme::kTextDim);
-        if (Button(Rectangle{rx + 24.0f, 610.0f, rw - 48.0f, 56.0f}, "APPLY COMBINED")) SetSens(combined);
-    }
+    const CombinedResult comb = CombineSessions(finderSessions_, cfg_.dpi);
+    if (comb.sens > 0.0) DrawCombined(Rectangle{rx, 390.0f, rw, 300.0f}, comb);
 
     if (Button(Rectangle{x0, VH() - 100.0f, 260.0f, 60.0f}, "BACK") || IsKeyPressed(KEY_ESCAPE)) {
         screen_ = Screen::MainMenu;
@@ -1349,20 +1370,14 @@ void App::ScreenFinderFinal() {
 
     const float rx = x0 + 980.0f, rw = kContentWidth - 980.0f;
     Angled(Rectangle{rx, 280.0f, rw, 420.0f}, theme::kPanel, 16.0f);
-    const double combined = CombinedRecommendation(finderSessions_, cfg_.dpi);
+    const CombinedResult comb = CombineSessions(finderSessions_, cfg_.dpi);
     Text(TextFormat("ALL SESSIONS (%d)", static_cast<int>(finderSessions_.size())), rx + 24.0f, 300.0f, 20.0f, theme::kAccent);
-    Text(TextFormat("%.3f", combined), rx + 24.0f, 334.0f, 52.0f, theme::kText);
-    Text(TextFormat("eDPI %.0f  |  %.1f cm/360 @ %.0f DPI", val::Edpi(cfg_.dpi, combined), val::Cm360(cfg_.dpi, combined),
-                    cfg_.dpi),
-         rx + 24.0f, 398.0f, 18.0f, theme::kTextDim);
-    TextBlock("Averaging several sessions from different days removes day-to-day noise and gives the most reliable result.",
-              rx + 24.0f, 440.0f, rw - 48.0f, 18.0f, theme::kTextDim);
+    if (comb.sens > 0.0) DrawCombined(Rectangle{rx, 330.0f, rw, 370.0f}, comb);
 
-    const bool appliedThis = std::fabs(cfg_.sens - rec) < 1e-9;
+    const bool appliedThis = std::fabs(cfg_.sens - rec) < 5e-4;
     if (Button(Rectangle{x0, 730.0f, 380.0f, 68.0f}, appliedThis ? "APPLIED" : "APPLY THIS RESULT", true, !appliedThis)) {
-        SetSens(rec);
+        ApplySens(rec);
     }
-    if (Button(Rectangle{rx + 24.0f, 610.0f, rw - 48.0f, 60.0f}, "APPLY COMBINED", false, combined > 0.0)) SetSens(combined);
     if (Button(Rectangle{x0 + 400.0f, 730.0f, 260.0f, 68.0f}, "MAIN MENU") || IsKeyPressed(KEY_ESCAPE)) {
         screen_ = Screen::MainMenu;
         return;

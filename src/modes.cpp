@@ -249,6 +249,13 @@ void Mode::MarkFlickStart() {
 
 Vector3 Mode::PointFromAngles(double yawDeg, double pitchDeg, double dist) const {
     const Vector3 eye = ctx_.cam->Eye();
+    // Never below the floor: targets spawned relative to where you aim (a low
+    // crosshair, a far target) would otherwise end up underground.
+    constexpr double kMinHeight = 0.5;  // metres, keeps even a body-sized sphere above the floor
+    if (dist > 0.0) {
+        const double minPitch = val::RadToDeg(std::asin(Clamp((kMinHeight - eye.y) / dist, -1.0, 1.0)));
+        pitchDeg = std::max(pitchDeg, minPitch);
+    }
     const Vector3 d = DirectionFromAngles(yawDeg, pitchDeg);
     const float k = static_cast<float>(dist);
     return Vector3{eye.x + d.x * k, eye.y + d.y * k, eye.z + d.z * k};
@@ -341,7 +348,7 @@ private:
         tg.kind = TargetKind::Sphere;
         tg.radius = 0.30f * ctx_.diff.size;
         tg.pos = Vector3{(static_cast<float>(col) - 2.0f) * 1.0f,
-                         ValCamera::kEyeHeight + (static_cast<float>(row) - 1.5f) * 0.85f, -10.0f};
+                         ValCamera::kEyeHeight + 0.35f + (static_cast<float>(row) - 1.5f) * 0.85f, -10.0f};  // bottom row clear of the floor on Easy too
         tg.tag = cell;
         targets_.push_back(tg);
     }

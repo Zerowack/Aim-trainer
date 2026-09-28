@@ -386,8 +386,12 @@ Copy the new value into Valorant to keep both games the same. Everything is appe
    warming up doesn't favour whichever sens you happened to play last. It's shown with eDPI, cm/360,
    a likely range and a graph of every test. Click **Apply** to use it. If you did best at the edge of
    the range, apply it and run the finder again from there.
-5. Run it on different days. The combined recommendation averages all sessions in
-   cm/360, so it stays correct even if you change DPI.
+5. Run it on different days. The combined recommendation is the **median** of your sessions in
+   cm/360, so it stays correct even if you change DPI and one odd session can't drag it. Sessions
+   that ended on the edge of the tested range (no real peak) are marked **EDGE** and left out while
+   at least one session found a real peak. If your sessions disagree by more than 30%, it tells you
+   to run it again before trusting the result. Apply buttons show **APPLIED** and a confirmation, and
+   your current sens is shown at the top of the finder.
 
 ---
 

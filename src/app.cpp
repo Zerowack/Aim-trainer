@@ -152,6 +152,13 @@ void App::SetSens(double sens) {
     SaveConfig();
 }
 
+void App::ApplySens(double sens) {
+    SetSens(sens);
+    screenshotToast_ = TextFormat("SENS SET TO %.3f (eDPI %.0f)  -  set the same value in Valorant", cfg_.sens,
+                                  val::Edpi(cfg_.dpi, cfg_.sens));
+    screenshotToastUntil_ = platform::Now() + 3.0;
+}
+
 void App::SyncSensText() {
     dpiText_ = Trimmed(cfg_.dpi, 0);
     customFpsText_ = std::to_string(cfg_.customFpsCap);

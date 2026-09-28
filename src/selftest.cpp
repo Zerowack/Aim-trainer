@@ -156,6 +156,27 @@ bool RunSelfTest(std::string& report) {
         ss[1].dpi = 1600.0;
         ss[1].recommended = 0.2;
         c.Near("combined recommendation (same cm/360)", CombinedRecommendation(ss, 800.0), 0.4, 1e-9);
+
+        // A real result (0.249) and an edge result (0.096 = pro x0.55 at 1600 DPI):
+        // the edge one is left out instead of dragging the average to 0.139.
+        std::vector<FinderSession> mixed(2);
+        mixed[0].dpi = 1600.0;
+        mixed[0].startSens = 0.23;
+        mixed[0].recommended = 0.249;
+        mixed[1].dpi = 1600.0;
+        mixed[1].startSens = 0.23;
+        mixed[1].recommended = 0.09625;
+        mixed[1].reliable = false;
+        const CombinedResult cr = CombineSessions(mixed, 1600.0);
+        c.True("combined leaves edge results out", cr.used == 1 && cr.leftOut == 1 && std::fabs(cr.sens - 0.249) < 1e-9);
+        std::vector<FinderSession> three(3);
+        const double sens3[3] = {0.20, 0.22, 0.40};
+        for (int i = 0; i < 3; ++i) {
+            three[static_cast<size_t>(i)].dpi = 1600.0;
+            three[static_cast<size_t>(i)].recommended = sens3[i];
+        }
+        const CombinedResult c3 = CombineSessions(three, 1600.0);
+        c.True("combined uses the median and flags disagreement", std::fabs(c3.sens - 0.22) < 1e-9 && c3.Disagree());
     }
 
     // --- Coach sens suggestion (also used by auto-adjust) -------------------

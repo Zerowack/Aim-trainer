@@ -54,6 +54,10 @@ struct FinderSession {
     double startSens = 0.0;
     double recommended = 0.0;
     double cm360 = 0.0;
+    // Did the session find a real peak? A result stuck at the edge of the
+    // tested range is only a direction, not an answer. Sessions saved before
+    // this flag existed are judged by whether the result sits on a range edge.
+    bool reliable = true;
 };
 
 // Result of the curve fit.
@@ -122,7 +126,17 @@ private:
 };
 
 std::vector<FinderSession> LoadFinderSessions(const std::string& dir);
-// Average of all sessions, done in cm/360 so sessions at different DPIs can
-// be combined, then converted back to a sens at 'currentDpi'. Returns 0 if
-// there are no sessions.
+// Combined result of all saved sessions, done in cm/360 so sessions at
+// different DPIs can be combined, then converted back to a sens at
+// 'currentDpi'. It is the median of the reliable sessions (edge results are
+// left out while at least one real peak exists), so one odd session can't
+// drag it.
+struct CombinedResult {
+    double sens = 0.0;      // 0 = no sessions
+    int used = 0;           // sessions in the median
+    int leftOut = 0;        // edge results not counted
+    double spreadPct = 0.0; // largest / smallest cm/360 of the used sessions, in % above 1
+    bool Disagree() const { return used >= 2 && spreadPct > 30.0; }
+};
+CombinedResult CombineSessions(const std::vector<FinderSession>& sessions, double currentDpi);
 double CombinedRecommendation(const std::vector<FinderSession>& sessions, double currentDpi);
