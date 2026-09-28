@@ -781,10 +781,12 @@ private:
 };
 
 // ===========================================================================
-// Crosshair Placement: agents appear beside pillars placed around the range.
-// You are scored on where your crosshair already was when an agent appeared
-// (angle to its head), and on how much of the time your crosshair sits at
-// head level - which in Valorant is the eye line (pitch ~0).
+// Crosshair Placement: a pre-aim drill. Five angles (pillars, two of them on
+// raised ledges) are all in front of you. The next angle lights up, then an
+// agent swings out from behind it. You are scored on where your crosshair
+// already was when the agent became visible (angle to its head): hold the
+// lit edge at head height. On Hard and Insane the whole pillar lights up, so
+// you have to guess the side; the warning also gets shorter.
 
 class PlacementMode : public Mode {
 public:
@@ -794,64 +796,238 @@ public:
     PlacementMode& operator=(const PlacementMode&) = delete;
 
     void Begin(double t) override {
-        // Pillars at different angles and distances form the "angles" to hold.
-        const double yaws[kSpots] = {-58.0, -34.0, -14.0, 9.0, 30.0, 55.0};
-        const double dists[kSpots] = {13.0, 20.0, 26.0, 16.0, 23.0, 14.0};
+        // Yaw, distance and ledge height of each angle. All within +-32 deg so
+        // every angle is on screen at once (Valorant's 103 deg FOV shows +-51).
+        const double yaws[kSpots] = {-32.0, -15.0, 0.0, 16.0, 31.0};
+        const double dists[kSpots] = {14.0, 24.0, 18.0, 27.0, 15.0};
+        const float ledges[kSpots] = {0.0f, 1.4f, 0.0f, 2.4f, 0.0f};
         std::vector<Box> covers;
+        const Vector3 eye = ctx_.cam->Eye();
         for (int i = 0; i < kSpots; ++i) {
+            Spot& sp = spots_[i];
             const Vector3 d = DirectionFromAngles(yaws[i], 0.0);
-            spots_[i] = Vector3{d.x * static_cast<float>(dists[i]), 0.0f, d.z * static_cast<float>(dists[i])};
-            spotYaw_[i] = yaws[i];
-            covers.push_back(Box{Vector3{spots_[i].x, 1.5f, spots_[i].z}, Vector3{1.4f, 3.0f, 1.4f}});
+            sp.center = Vector3{d.x * static_cast<float>(dists[i]), 0.0f, d.z * static_cast<float>(dists[i])};
+            sp.ledge = ledges[i];
+            // Directions as seen from the player: towards the pillar and to its right.
+            const float len = std::hypot(sp.center.x - eye.x, sp.center.z - eye.z);
+            sp.fwd = Vector3{(sp.center.x - eye.x) / len, 0.0f, (sp.center.z - eye.z) / len};
+            sp.right = Vector3{-sp.fwd.z, 0.0f, sp.fwd.x};
+            if (sp.ledge > 0.0f) {
+                covers.push_back(Box{Vector3{sp.center.x, sp.ledge * 0.5f, sp.center.z}, Vector3{5.0f, sp.ledge, 3.4f}});
+            }
+            covers.push_back(Box{Vector3{sp.center.x, sp.ledge + 1.6f, sp.center.z}, Vector3{kPillar, 3.2f, kPillar}});
         }
         ctx_.world->SetCovers(covers);
         targets_.clear();
-        nextAt_ = t + ctx_.rng->Uniform(0.8, 1.6);
+        phase_ = Phase::Idle;
+        phaseEnd_ = t + ctx_.rng->Uniform(0.8, 1.4);
     }
 
     void Update(double t, double dt, bool /*triggerHeld*/) override {
         TickTargets(dt);
         UpdateReactionOnset(t);
-        // Head level = within 1.5 degrees of the eye line.
-        stats_.headLevelTotal += dt;
-        if (std::fabs(ctx_.cam->Pitch()) < 1.5) stats_.headLevelTime += dt;
-
-        if (targets_.empty()) {
-            if (t >= nextAt_) Spawn();
-        } else if (targets_[0].presented && t - targets_[0].spawnTime > targets_[0].lifetime) {
-            stats_.expired++;
-            stats_.score -= 50;
-            targets_.clear();
-            nextAt_ = t + ctx_.rng->Uniform(0.6, 1.5);
+        // Head level: while an angle is lit or the agent is out, is the
+        // crosshair within 1.5 deg of that angle's head height?
+        if (phase_ != Phase::Idle) {
+            stats_.headLevelTotal += dt;
+            if (std::fabs(ctx_.cam->Pitch() - HeadPitch(spots_[active_])) < 1.5) stats_.headLevelTime += dt;
+        }
+        switch (phase_) {
+            case Phase::Idle:
+                if (t >= phaseEnd_) StartCue(t);
+                break;
+            case Phase::Cue:
+                if (t >= phaseEnd_) StartPeek();
+                break;
+            case Phase::Out:
+                Move(exposedOff_, dt);
+                CheckVisible(t);
+                if (!targets_.empty() && std::fabs(offset_ - exposedOff_) < 1e-3f) {
+                    phase_ = Phase::Hold;
+                    phaseEnd_ = t + ctx_.rng->Uniform(0.55, 0.95) * ctx_.diff.time;
+                }
+                break;
+            case Phase::Hold:
+                if (t >= phaseEnd_) phase_ = Phase::Back;
+                break;
+            case Phase::Back:
+                Move(0.0f, dt);
+                if (std::fabs(offset_) < 1e-3f) {
+                    targets_.clear();
+                    stats_.expired++;
+                    stats_.score -= 50;
+                    EnterIdle(t);
+                }
+                break;
         }
     }
 
     void Draw3D() const override {
         ctx_.world->DrawCovers();
+        if (phase_ != Phase::Idle) DrawCue();
         Mode::Draw3D();
     }
 
     void DrawHud(double t) const override {
+        ui::Text("HOLD THE LIT ANGLE AT HEAD HEIGHT", ui::VW() * 0.5f, ui::VH() * 0.5f + 150.0f, 16.0f,
+                 ui::Alpha(ui::theme::kTextDim, 0.7f), ui::Align::Center);
         const double hl = stats_.HeadLevelPct();
+        const bool level = phase_ != Phase::Idle && std::fabs(ctx_.cam->Pitch() - HeadPitch(spots_[active_])) < 1.5;
         ui::Text(TextFormat("HEAD LEVEL %.0f%%", std::max(0.0, hl) * 100.0), ui::VW() * 0.5f, ui::VH() * 0.5f + 190.0f, 22.0f,
-                 ui::Alpha(std::fabs(ctx_.cam->Pitch()) < 1.5 ? ui::theme::kGood : ui::theme::kTextDim, 0.9f), ui::Align::Center);
-        if (t - lastPlacementTime_ < 1.0) {
+                 ui::Alpha(level ? ui::theme::kGood : ui::theme::kTextDim, 0.9f), ui::Align::Center);
+        if (t - lastPlacementTime_ < 1.2) {
             const char* dir = lastPlacementVert_ < -0.8 ? "  (too low)" : (lastPlacementVert_ > 0.8 ? "  (too high)" : "");
             ui::Text(TextFormat("PLACEMENT %.1f deg%s", lastPlacementErr_, dir), ui::VW() * 0.5f, ui::VH() * 0.5f + 90.0f, 22.0f,
-                     lastPlacementErr_ < 2.5 ? ui::theme::kGood : (lastPlacementErr_ < 6.0 ? ui::theme::kWarn : ui::theme::kAccent),
+                     lastPlacementErr_ < 1.5 ? ui::theme::kGood : (lastPlacementErr_ < 4.0 ? ui::theme::kWarn : ui::theme::kAccent),
                      ui::Align::Center);
         }
     }
 
 protected:
     bool AimHead() const override { return true; }
-    double TtkStart(const Target& target) const override { return target.spawnTime; }
+    void OnTargetPresented(Target& /*target*/, double /*t*/) override {}  // placement / reaction start when visible
+    double TtkStart(const Target& /*target*/) const override { return visibleTime_; }
 
-    void OnTargetPresented(Target& target, double t) override {
-        ArmReaction(t);
-        // Where was the crosshair when the agent became visible?
+    void OnHit(size_t /*index*/, const TargetHit& hit, double t) override {
+        const double exposed = visible_ ? t - visibleTime_ : 0.0;
+        // Good pre-aim is worth up to 150, a fast kill up to 100.
+        const double placeBonus = visible_ ? std::max(0.0, 150.0 - placementAtVisible_ * 30.0) : 0.0;
+        stats_.score += 100 + (hit.head ? 50 : 0) + static_cast<long long>(std::lround(placeBonus)) +
+                        static_cast<long long>(std::lround(Clamp(1.0 - exposed, 0.0, 1.0) * 100.0));
+        ctx_.audio->Play(hit.head ? Sfx::Headshot : Sfx::Kill);
+        targets_.clear();
+        EnterIdle(t);
+    }
+
+private:
+    static constexpr int kSpots = 5;
+    static constexpr float kPillar = 1.4f;
+    enum class Phase { Idle, Cue, Out, Hold, Back };
+
+    struct Spot {
+        Vector3 center = {0.0f, 0.0f, 0.0f};
+        Vector3 fwd = {0.0f, 0.0f, -1.0f};
+        Vector3 right = {1.0f, 0.0f, 0.0f};
+        float ledge = 0.0f;
+    };
+
+    // Pitch from the eye to an agent's head standing at this spot.
+    double HeadPitch(const Spot& sp) const {
         const Vector3 eye = ctx_.cam->Eye();
-        const Vector3 head = TargetAimPoint(target, true);
+        const float headY = sp.ledge + hitbox::kHeadCenterY;
+        const double dist = std::hypot(sp.center.x - eye.x, sp.center.z - eye.z);
+        return val::RadToDeg(std::atan2(headY - eye.y, dist));
+    }
+
+    void EnterIdle(double t) {
+        phase_ = Phase::Idle;
+        phaseEnd_ = t + ctx_.rng->Uniform(0.5, 1.1);
+    }
+
+    void StartCue(double t) {
+        int next = ctx_.rng->Int(0, kSpots - 1);
+        if (next == active_) next = (next + 1 + ctx_.rng->Int(0, kSpots - 2)) % kSpots;  // a new angle each time
+        active_ = next;
+        side_ = ctx_.rng->Sign();
+        // Warning before the peek: 1.1 s on Normal (1.5 Easy, 0.85 Hard, 0.65 Insane).
+        phaseEnd_ = t + 1.1 * ctx_.diff.time * ctx_.rng->Uniform(0.85, 1.15);
+        phase_ = Phase::Cue;
+    }
+
+    // Lit edge: the pillar's silhouette edge on the peek side (Easy / Normal),
+    // or both edges (Hard / Insane: the side is a guess).
+    void DrawCue() const {
+        const Spot& sp = spots_[active_];
+        const bool bothSides = ctx_.difficulty == Difficulty::Hard || ctx_.difficulty == Difficulty::Insane;
+        const Color glow = {255, 196, 70, 255};
+        for (int s = -1; s <= 1; s += 2) {
+            if (!bothSides && s != side_) continue;
+            const Vector3 c = EdgeCorner(sp, s);
+            ctx_.world->DrawBoxLit(Vector3{c.x, sp.ledge + 1.6f, c.z}, Vector3{0.07f, 3.2f, 0.07f}, glow, Surface::Glow);
+        }
+    }
+
+    // The pillar corner that forms its outline on side 's' as seen from the player.
+    Vector3 EdgeCorner(const Spot& sp, int s) const {
+        Vector3 best = sp.center;
+        float bestScore = -1e30f;
+        const float h = kPillar * 0.5f;
+        for (int cx = -1; cx <= 1; cx += 2) {
+            for (int cz = -1; cz <= 1; cz += 2) {
+                const float ox = static_cast<float>(cx) * h, oz = static_cast<float>(cz) * h;
+                const float score = static_cast<float>(s) * (ox * sp.right.x + oz * sp.right.z) - 0.2f * (ox * sp.fwd.x + oz * sp.fwd.z);
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = Vector3{sp.center.x + ox + 0.02f * static_cast<float>(cx), 0.0f, sp.center.z + oz + 0.02f * static_cast<float>(cz)};
+                }
+            }
+        }
+        return best;
+    }
+
+    // The agent waits 1.3 m behind the pillar (hidden) and swings out sideways.
+    void StartPeek() {
+        const Spot& sp = spots_[active_];
+        const Vector3 eye = ctx_.cam->Eye();
+        const float dist = std::hypot(sp.center.x - eye.x, sp.center.z - eye.z);
+        const float scale = (dist + kBehind) / dist;  // the pillar's shadow widens behind it
+        const float halfBody = hitbox::kTorsoWidth * 0.5f;
+        exposedOff_ = static_cast<float>(side_) * ((kPillar * 0.72f + halfBody) * scale + ctx_.rng->UniformF(0.25f, 0.7f));
+        offset_ = 0.0f;
+        Target tg;
+        tg.kind = TargetKind::Humanoid;
+        tg.pos = AgentPos(sp, 0.0f);
+        tg.yaw = static_cast<float>(val::RadToDeg(std::atan2(-sp.fwd.x, sp.fwd.z)));  // facing the player
+        targets_.clear();
+        targets_.push_back(tg);
+        visible_ = false;
+        phase_ = Phase::Out;
+    }
+
+    Vector3 AgentPos(const Spot& sp, float off) const {
+        return Vector3{sp.center.x + sp.fwd.x * kBehind + sp.right.x * off, sp.ledge, sp.center.z + sp.fwd.z * kBehind + sp.right.z * off};
+    }
+
+    void Move(float to, double dt) {
+        if (targets_.empty()) return;
+        const float step = static_cast<float>(kRunSpeed * ctx_.diff.speed * dt);
+        if (std::fabs(to - offset_) <= step) offset_ = to;
+        else offset_ += (to > offset_ ? step : -step);
+        Target& tg = targets_[0];
+        tg.pos = AgentPos(spots_[active_], offset_);
+        tg.moveSpeed = std::fabs(to - offset_) > 1e-3f ? static_cast<float>(kRunSpeed * ctx_.diff.speed) : 0.0f;
+        tg.walkPhase += static_cast<float>(tg.moveSpeed * dt * 2.6);
+    }
+
+    // Visible = the head or either side of the torso has a clear line of sight.
+    void CheckVisible(double t) {
+        if (visible_ || targets_.empty()) return;
+        const Target& tg = targets_[0];
+        const Vector3 eye = ctx_.cam->Eye();
+        const Spot& sp = spots_[active_];
+        const float hw = hitbox::kTorsoWidth * 0.5f;
+        const Vector3 head = TargetAimPoint(tg, true);
+        const Vector3 chest = TargetAimPoint(tg, false);
+        const Vector3 pts[3] = {head, Vector3{chest.x + sp.right.x * hw, chest.y, chest.z + sp.right.z * hw},
+                                Vector3{chest.x - sp.right.x * hw, chest.y, chest.z - sp.right.z * hw}};
+        for (const Vector3& p : pts) {
+            const Vector3 d = {p.x - eye.x, p.y - eye.y, p.z - eye.z};
+            const float len = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+            const Ray ray{eye, Vector3{d.x / len, d.y / len, d.z / len}};
+            if (ctx_.world->RaycastCovers(ray) >= len) {
+                visible_ = true;
+                visibleTime_ = t;
+                ArmReaction(t);
+                MeasurePlacement(t);
+                return;
+            }
+        }
+    }
+
+    // Where was the crosshair when the agent became visible?
+    void MeasurePlacement(double t) {
+        const Vector3 eye = ctx_.cam->Eye();
+        const Vector3 head = TargetAimPoint(targets_[0], true);
         double yaw = 0.0, pitch = 0.0;
         AnglesFromDirection(Vector3{head.x - eye.x, head.y - eye.y, head.z - eye.z}, yaw, pitch);
         const double err = AngleToPoint(*ctx_.cam, head);
@@ -861,46 +1037,24 @@ protected:
         lastPlacementErr_ = err;
         lastPlacementVert_ = ctx_.cam->Pitch() - pitch;
         lastPlacementTime_ = t;
-        placementAtSpawn_ = err;
+        placementAtVisible_ = err;
     }
 
-    void OnHit(size_t /*index*/, const TargetHit& hit, double t) override {
-        const double exposed = t - targets_[0].spawnTime;
-        // Good pre-aim is worth up to 150, a fast kill up to 100.
-        const double placeBonus = std::max(0.0, 150.0 - placementAtSpawn_ * 25.0);
-        stats_.score += 100 + (hit.head ? 50 : 0) + static_cast<long long>(std::lround(placeBonus)) +
-                        static_cast<long long>(std::lround(Clamp(1.0 - exposed, 0.0, 1.0) * 100.0));
-        ctx_.audio->Play(hit.head ? Sfx::Headshot : Sfx::Kill);
-        targets_.clear();
-        nextAt_ = t + ctx_.rng->Uniform(0.6, 1.5);
-    }
-
-private:
-    static constexpr int kSpots = 6;
-
-    void Spawn() {
-        const int i = ctx_.rng->Int(0, kSpots - 1);
-        const int side = ctx_.rng->Sign();
-        // "Right" relative to the view direction towards the pillar.
-        const double y = val::DegToRad(spotYaw_[i]);
-        const Vector3 right = {static_cast<float>(std::cos(y)), 0.0f, static_cast<float>(std::sin(y))};
-        const float off = static_cast<float>(side) * 1.05f;
-        Target tg;
-        tg.kind = TargetKind::Humanoid;
-        tg.pos = Vector3{spots_[i].x + right.x * off, 0.0f, spots_[i].z + right.z * off};
-        tg.lifetime = 1.3 * ctx_.diff.time;
-        targets_.push_back(tg);
-    }
-
-    Vector3 spots_[kSpots] = {};
-    double spotYaw_[kSpots] = {};
-    double nextAt_ = 0.0;
-    double placementAtSpawn_ = 0.0;
+    static constexpr float kBehind = 1.3f;
+    Spot spots_[kSpots];
+    int active_ = 0;
+    int side_ = 1;
+    Phase phase_ = Phase::Idle;
+    double phaseEnd_ = 0.0;
+    float offset_ = 0.0f;
+    float exposedOff_ = 0.0f;
+    bool visible_ = false;
+    double visibleTime_ = 0.0;
+    double placementAtVisible_ = 0.0;
     double lastPlacementErr_ = 0.0;
     double lastPlacementVert_ = 0.0;
     double lastPlacementTime_ = -10.0;
 };
-
 
 // ===========================================================================
 // Mixed test for the sensitivity finder (20 s):

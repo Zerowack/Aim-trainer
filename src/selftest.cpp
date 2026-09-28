@@ -202,10 +202,10 @@ bool RunSelfTest(std::string& report) {
         pl.mode = ModeId::Placement;
         pl.duration = 60.0;
         pl.hits = 20;
-        pl.placementErr = 5.8;  // Gold's start
-        c.True("rank: placement 5.8 deg = Gold 1", RankFromRecord(pl, r) && RankLabel(r) == "Gold 1");
-        pl.placementErr = 1.0;
-        c.True("rank: placement 1.0 deg = Radiant", RankFromRecord(pl, r) && RankLabel(r) == "Radiant");
+        pl.placementErr = 3.5;  // Gold's start
+        c.True("rank: placement 3.5 deg = Gold 1", RankFromRecord(pl, r) && RankLabel(r) == "Gold 1");
+        pl.placementErr = 0.8;
+        c.True("rank: placement 0.8 deg = Radiant", RankFromRecord(pl, r) && RankLabel(r) == "Radiant");
         RunRecord sn;
         sn.mode = ModeId::Sniper;
         sn.duration = 60.0;

@@ -219,10 +219,12 @@ Enter/Space. Esc quits the plan. Every task is saved as a normal run.
    Timing starts at the first frame that shows the target. Clicking early costs points.
 6. **Peek Practice**: agents swing out from behind three cover boxes for a short
    window, like holding an angle. Headshots score extra.
-7. **Crosshair Placement**: agents appear beside pillars placed at different angles and distances.
-   You're scored on where your crosshair **already was** when an agent appeared (the angle to its
-   head), plus how much of the time you keep it at head level. In Valorant that's your eye line.
-   The coach tells you if you hold your crosshair too low or too high.
+7. **Crosshair Placement**: a pre-aim drill. Five angles (pillars, two of them on raised ledges) are
+   all on screen. The next angle lights up about a second before an agent swings out from behind it.
+   You're scored on where your crosshair **already was** when the agent became visible (the angle to
+   its head), plus how much of the time you hold the lit angle's head height. On Hard and Insane the
+   whole pillar lights up, so you have to guess the side, and the warning is shorter. The coach tells
+   you if you hold your crosshair too low or too high.
 8. **Sniper**: hold (and retake) a long angle, like C long on Haven. Pick a **Marshal**, **Outlaw** or
    **Operator**, then a difficulty. The lane ends in a big wall with a box on each side in front of it;
    enemies peek from behind them one at a time, from a random side, so you have to flick between the

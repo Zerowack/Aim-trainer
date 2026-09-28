@@ -114,7 +114,7 @@ const char* ModeDescription(ModeId m) {
         case ModeId::Flick180: return "Targets spawn beside or behind you. Big turns, clean stops.";
         case ModeId::Reaction: return "Wait for the target, then click as fast as you can. Measured in ms.";
         case ModeId::Peek: return "Agents peek from behind cover for a split second. Hold the angle.";
-        case ModeId::Placement: return "Keep your crosshair at head level on the angles. Scored on pre-aim.";
+        case ModeId::Placement: return "An angle lights up, then an agent peeks it. Pre-aim the edge at head height.";
         case ModeId::Sniper: return "Hold a long angle like C long. Enemies swing, jump and crouch peek. Stop to shoot.";
         case ModeId::VsBot: return "1v1 duel against a bot from Iron to Radiant. Move, crouch, counter-strafe, first to 5.";
         case ModeId::Headshot: return "Agents appear around you. Only headshots count - body shots are misses.";
@@ -399,15 +399,16 @@ std::vector<std::string> BuildTips(const RunStats& s, double sens) {
         } else if (vert > 1.0) {
             tips.push_back("Your crosshair sits " + Fmt(vert, 1) + " deg above head level. Lower it slightly.");
         }
-        if (place > 5.0) {
+        if (place > 3.5) {
             tips.push_back("Placement error " + Fmt(place, 1) +
                            " deg. Pre-aim the edge of cover where agents can appear, not the middle of the wall.");
-        } else if (place < 2.0) {
+        } else if (place < 1.5) {
             tips.push_back("Great placement (" + Fmt(place, 1) + " deg). Most kills should need only a micro-adjustment.");
         }
         const double hl = s.HeadLevelPct();
         if (hl >= 0.0 && hl < 0.5) {
-            tips.push_back("Crosshair at head level only " + Fmt(hl * 100.0, 0) + "% of the time. Keep it on the horizon line.");
+            tips.push_back("Crosshair at head level only " + Fmt(hl * 100.0, 0) +
+                           "% of the time. Move it to head height of the lit angle before the agent peeks (ledges are higher).");
         }
     }
 

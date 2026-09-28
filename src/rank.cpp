@@ -53,8 +53,10 @@ bool ThresholdsFor(ModeId m, Thresholds& t) {
         case ModeId::LongRange: t = {{0.63, 0.73, 0.85, 0.96, 1.08, 1.21, 1.34, 1.47, 1.70}, false}; return true;
         case ModeId::Microflex: t = {{1.07, 1.19, 1.29, 1.37, 1.45, 1.54, 1.63, 1.71, 1.82}, false}; return true;
         case ModeId::Popcorn: t = {{0.30, 0.62, 0.95, 1.18, 1.40, 1.75, 2.10, 2.45, 2.80}, false}; return true;
-        // Crosshair Placement: average angle to the head when agents appear (deg).
-        case ModeId::Placement: t = {{12.0, 9.5, 7.5, 5.8, 4.5, 3.5, 2.6, 1.9, 1.2}, true}; return true;
+        // Crosshair Placement: average angle from the crosshair to the head at
+        // the moment the agent peeks out (deg). The angle is lit beforehand, so
+        // this measures how precisely you pre-aim the edge at head height.
+        case ModeId::Placement: t = {{7.0, 5.5, 4.4, 3.5, 2.8, 2.2, 1.7, 1.3, 0.9}, true}; return true;
         default: return false;
     }
 }
