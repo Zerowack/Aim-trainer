@@ -1219,19 +1219,19 @@ void App::ScreenStats() {
 void App::ScreenFinderIntro() {
     const float x0 = ContentX();
     Title("SENS FINDER", x0, 50.0f, 52.0f);
-    TextBlock("Perfect Sensitivity Approximation (PSA). Starting from your current sens, you play two blind 20 second "
-              "tests per round - one at the top and one at the bottom of the range (first x1.5 and x0.5). Each test mixes "
-              "flicks, tracking and micro-adjustments and is scored on accuracy, time-to-kill, click precision (over/"
-              "undershoot), tracking and your 1-5 comfort rating. The range then halves toward the better side. After 7 "
-              "rounds (about 6 minutes) you get a recommendation. Run it on different days: sessions are saved and averaged.",
+    TextBlock("Finds the sens you actually perform best at - no questions, no feel ratings. You play 18 short tests "
+              "(20 s each: flicks, tracking and micro-adjustments) at hidden sensitivities, about 7 minutes in total. "
+              "One warm-up test at your current sens, a scan of 7 sensitivities from x0.55 to x1.8, then 10 tests "
+              "around the best area. The result is the peak of a curve fitted through all scored tests, corrected for "
+              "warming up during the session. Run it on different days: sessions are saved and averaged.",
               x0, 130.0f, 900.0f, 21.0f, theme::kTextDim);
 
     Text("STARTING POINT", x0, 380.0f, 20.0f, theme::kAccent);
     DrawSensSummary(x0, 410.0f, 900.0f, cfg_.dpi, cfg_.sens);
-    Text(TextFormat("Range round 1: %.3f  vs  %.3f", cfg_.sens * 0.5, cfg_.sens * 1.5), x0, 520.0f, 22.0f, theme::kText);
+    Text(TextFormat("Scan range: %.3f - %.3f", cfg_.sens * 0.55, cfg_.sens * 1.8), x0, 520.0f, 22.0f, theme::kText);
 
     if (Button(Rectangle{x0, 580.0f, 380.0f, 66.0f}, "START NEW SESSION", true)) {
-        finder_.Start(cfg_.sens, cfg_.dpi, static_cast<unsigned int>(rng_.Int(0, 0xFFFF)));
+        finder_.Start(cfg_.sens, cfg_.dpi, static_cast<unsigned int>(rng_.Int(1, 0x7FFFFFFF)));
         finderSaved_ = false;
         screen_ = Screen::FinderReady;
         return;
@@ -1268,20 +1268,33 @@ void App::ScreenFinderIntro() {
 
 void App::ScreenFinderReady() {
     const float x0 = ContentX();
-    Title(TextFormat("ROUND %d / %d", finder_.Round(), SensFinder::kRounds), x0, 60.0f, 52.0f);
+    const int n = finder_.TestNumber();
+    Title(TextFormat("TEST %d / %d", n, SensFinder::kTotalTests), x0, 60.0f, 52.0f);
 
-    // Round progress bar.
-    const float bw = kContentWidth / SensFinder::kRounds;
-    for (int i = 0; i < SensFinder::kRounds; ++i) {
-        const Color c = i + 1 < finder_.Round() ? theme::kAccent : (i + 1 == finder_.Round() ? theme::kText : theme::kPanel2);
-        Fill(Rectangle{x0 + static_cast<float>(i) * bw, 140.0f, bw - 6.0f, 8.0f}, c);
+    // Progress bar, one segment per test.
+    const float bw = kContentWidth / SensFinder::kTotalTests;
+    for (int i = 0; i < SensFinder::kTotalTests; ++i) {
+        const Color c = i + 1 < n ? theme::kAccent : (i + 1 == n ? theme::kText : theme::kPanel2);
+        Fill(Rectangle{x0 + static_cast<float>(i) * bw, 140.0f, bw - 4.0f, 8.0f}, c);
     }
 
-    Text(TextFormat("TEST %c", finder_.CurrentLabel()), x0, 200.0f, 110.0f, theme::kAccent);
+    const FinderPhase phase = finder_.CurrentPhase();
+    Text(FinderPhaseName(phase), x0, 190.0f, 90.0f, theme::kAccent);
+    const char* what = phase == FinderPhase::Warmup
+                           ? "Warm-up at your current sens. It isn't scored - it just gets your hand ready."
+                           : (phase == FinderPhase::Scan ? "Scanning a wide range of sensitivities to find the right area."
+                                                         : "Testing sensitivities around your best area, each twice.");
+    Text(what, x0, 300.0f, 24.0f, theme::kText);
     TextBlock("20 seconds: 7 s of flicks, 7 s of tracking (hold fire on the strafing agent), then 6 s of small "
-              "micro-adjustment targets. The sensitivity is hidden until the round ends so you judge it by feel and "
-              "results only. Play normally - don't try to 'test' the sens.",
-              x0, 350.0f, 900.0f, 22.0f, theme::kTextDim);
+              "micro-adjustment targets. The sens is hidden. Play normally and aim for your best every time - the result "
+              "comes only from your performance.",
+              x0, 350.0f, 900.0f, 20.0f, theme::kTextDim);
+    if (!finder_.Tests().empty()) {
+        const FinderTest& last = finder_.Tests().back();
+        Text(TextFormat("Last test: score %.1f  |  accuracy %.0f%%  |  tracking %.0f%%", last.score.total, last.accuracyPct,
+                        last.trackingPct),
+             x0, 470.0f, 20.0f, theme::kTextDim);
+    }
 
     if (Button(Rectangle{x0, 520.0f, 340.0f, 70.0f}, "START TEST", true) || IsKeyPressed(KEY_ENTER) ||
         IsKeyPressed(KEY_SPACE)) {
@@ -1292,76 +1305,8 @@ void App::ScreenFinderReady() {
         finder_.Cancel();
         screen_ = Screen::FinderIntro;
     }
-}
-
-void App::ScreenFinderComfort() {
-    const float x0 = ContentX();
-    const RunStats& s = finderLastStats_;
-    Title(TextFormat("HOW DID TEST %c FEEL?", finder_.CurrentLabel()), x0, 60.0f, 52.0f);
-
-    const float tw = (kContentWidth - 30.0f) / 4.0f;
-    StatTile(Rectangle{x0, 170.0f, tw, 96.0f}, "ACCURACY", Fmt(s.shots > 0 ? 100.0 * s.hits / s.shots : 0.0, 1) + "%",
-             theme::kAccent);
-    StatTile(Rectangle{x0 + tw + 10.0f, 170.0f, tw, 96.0f}, "AVG TTK", MsOrDash(s.AvgTtkMs()), theme::kText);
-    StatTile(Rectangle{x0 + 2.0f * (tw + 10.0f), 170.0f, tw, 96.0f}, "TRACKING",
-             Fmt(std::max(0.0, s.TrackingPct()) * 100.0, 1) + "%", theme::kText);
-    StatTile(Rectangle{x0 + 3.0f * (tw + 10.0f), 170.0f, tw, 96.0f}, "OVER / UNDER",
-             TextFormat("%d / %d", s.overshoots, s.undershoots), theme::kText);
-
-    Text("Rate the comfort of this sensitivity (keys 1-5 work too):", x0, 320.0f, 24.0f, theme::kText);
-    static const char* const labels[] = {"1  VERY BAD", "2  UNCOMFORTABLE", "3  OK", "4  COMFORTABLE", "5  PERFECT"};
-    int picked = 0;
-    const float bw = (kContentWidth - 40.0f) / 5.0f;
-    for (int i = 0; i < 5; ++i) {
-        if (Button(Rectangle{x0 + static_cast<float>(i) * (bw + 10.0f), 370.0f, bw, 90.0f}, labels[i], i == 2)) picked = i + 1;
-        if (IsKeyPressed(KEY_ONE + i) || IsKeyPressed(KEY_KP_1 + i)) picked = i + 1;
-    }
-    if (picked > 0) {
-        const bool roundDone = finder_.Submit(s, picked);
-        finderRun_ = false;
-        screen_ = roundDone ? Screen::FinderRound : Screen::FinderReady;
-    }
-}
-
-void App::ScreenFinderRound() {
-    const float x0 = ContentX();
-    const int round = finder_.Finished() ? SensFinder::kRounds : finder_.Round() - 1;
-    Title(TextFormat("ROUND %d RESULT", round), x0, 60.0f, 52.0f);
-
-    const FinderTest* hi = finder_.LastRoundTest(true);
-    const FinderTest* lo = finder_.LastRoundTest(false);
-    const bool highWon = finder_.LastRoundHighWon();
-    auto panel = [&](float x, const FinderTest* t, bool won) {
-        if (!t) return;
-        const Rectangle r = {x, 160.0f, 720.0f, 380.0f};
-        Angled(r, won ? theme::kPanel2 : theme::kPanel, 16.0f);
-        if (won) Fill(Rectangle{r.x, r.y, 6.0f, r.height - 16.0f}, theme::kAccent);
-        Text(TextFormat("TEST %c  -  SENS %.3f", t->label, t->sens), r.x + 30.0f, r.y + 24.0f, 32.0f, theme::kText);
-        Text(won ? "WINNER" : "", r.x + r.width - 30.0f, r.y + 30.0f, 24.0f, theme::kAccent, Align::Right);
-        Text(TextFormat("SCORE %.1f", t->score.total), r.x + 30.0f, r.y + 80.0f, 44.0f, won ? theme::kAccent : theme::kText);
-        const char* const names[] = {"Accuracy", "Speed (TTK)", "Precision", "Tracking", "Comfort"};
-        const double vals[] = {t->score.accuracy, t->score.speed, t->score.precision, t->score.tracking, t->score.comfort};
-        for (int i = 0; i < 5; ++i) {
-            const float yy = r.y + 150.0f + static_cast<float>(i) * 42.0f;
-            Text(names[i], r.x + 30.0f, yy, 20.0f, theme::kTextDim);
-            Fill(Rectangle{r.x + 220.0f, yy + 6.0f, 380.0f, 12.0f}, theme::kBg);
-            Fill(Rectangle{r.x + 220.0f, yy + 6.0f, 380.0f * static_cast<float>(vals[i]), 12.0f}, theme::kAccentDim);
-            Text(Fmt(vals[i] * 100.0, 0), r.x + 690.0f, yy, 20.0f, theme::kText, Align::Right);
-        }
-    };
-    panel(x0, lo, !highWon);
-    panel(x0 + 780.0f, hi, highWon);
-    Text("LOWER SENS", x0, 548.0f, 18.0f, theme::kTextDim);
-    Text("HIGHER SENS", x0 + 780.0f, 548.0f, 18.0f, theme::kTextDim);
-
-    Text(TextFormat("Range narrows toward the %s side. New range: %.3f - %.3f", highWon ? "higher" : "lower", finder_.Low(),
-                    finder_.High()),
-         x0, 610.0f, 24.0f, theme::kText);
-
-    if (Button(Rectangle{x0, 680.0f, 340.0f, 70.0f}, finder_.Finished() ? "SEE RESULT" : "NEXT ROUND", true) ||
-        IsKeyPressed(KEY_ENTER)) {
-        screen_ = finder_.Finished() ? Screen::FinderFinal : Screen::FinderReady;
-    }
+    Text("Enter / Space: next test. Take a short break between tests if your hand gets tired.", x0, 620.0f, 18.0f,
+         theme::kTextDim);
 }
 
 void App::ScreenFinderFinal() {
@@ -1384,9 +1329,19 @@ void App::ScreenFinderFinal() {
              TextFormat("%+.1f%%  (was %.3f)", change, finder_.StartSens()), theme::kText);
 
     std::vector<ChartPoint> pts;
-    for (const FinderTest& t : finder_.Tests()) pts.push_back(ChartPoint{static_cast<float>(t.sens), static_cast<float>(t.score.total)});
-    ScatterChart(Rectangle{x0 + 60.0f, 300.0f, 860.0f, 380.0f}, pts, theme::kAccent, static_cast<float>(rec),
+    for (const FinderTest& t : finder_.Tests()) {
+        if (t.phase != FinderPhase::Warmup) pts.push_back(ChartPoint{static_cast<float>(t.sens), static_cast<float>(t.score.total)});
+    }
+    ScatterChart(Rectangle{x0 + 60.0f, 300.0f, 860.0f, 360.0f}, pts, theme::kAccent, static_cast<float>(rec),
                  "SENSITIVITY (green line = recommendation)", "TEST SCORE");
+    const FinderFit& fit = finder_.Fit();
+    if (fit.peaked) {
+        Text(TextFormat("Likely best range: %.3f - %.3f (your performance peaks here)", fit.low, fit.high), x0, 680.0f, 20.0f,
+             theme::kText);
+    } else {
+        Text("No clear peak: you did best at the edge of the tested range. Apply it and run the finder again from there.",
+             x0, 680.0f, 20.0f, theme::kWarn);
+    }
 
     const float rx = x0 + 980.0f, rw = kContentWidth - 980.0f;
     Angled(Rectangle{rx, 280.0f, rw, 420.0f}, theme::kPanel, 16.0f);
@@ -1408,7 +1363,7 @@ void App::ScreenFinderFinal() {
         screen_ = Screen::MainMenu;
         return;
     }
-    Text("Remember to set the same value in Valorant. Saved to finder_sessions.csv / finder_tests.csv.", x0, 820.0f, 18.0f,
+    Text("Remember to set the same value in Valorant. Saved to finder_sessions.csv / finder_tests_v2.csv.", x0, 820.0f, 18.0f,
          theme::kTextDim);
 }
 

@@ -20,9 +20,10 @@ Valorant:
 - **VS Bot:** a 1v1 Sheriff duel on a skirmish-style map against a bot from Iron to Radiant. You move
   like in Valorant: run, walk, crouch, jump and counter-strafe, with movement inaccuracy, visible
   recoil and a first-person pistol.
-- **Sens Finder:** uses the Perfect Sensitivity Approximation (PSA) method. It runs 7 rounds of blind A/B
-  tests, draws a graph of your results, and has a one-click "apply" button. Every session
-  is saved and combined into an average across days.
+- **Sens Finder:** finds the sens you actually perform best at, with no questions or feel ratings. It runs
+  18 blind 20-second tests at hidden sensitivities, fits a curve through your scores, draws a graph of
+  the results and has a one-click "apply" button. Every session is saved and combined into an average
+  across days.
 - **Stats:** after each run you get score, accuracy, reaction time, time-to-kill (TTK), and your
   overshoot/undershoot tendency, plus a coaching tip (e.g. *"You overshoot flicks, try
   lowering sens ~5%"*). Per-mode progress graphs and personal bests are included.
@@ -127,7 +128,7 @@ anywhere, for example to your desktop. It stores its files **next to the .exe**:
 | `config.ini` | all settings (DPI, sens, video, crosshair, keybinds …) |
 | `stats.csv` | one line per finished run (opens in Excel) |
 | `finder_sessions.csv` | one line per Sens Finder session (recommendation, cm/360) |
-| `finder_tests.csv` | every single Sens Finder test with its score breakdown |
+| `finder_tests_v2.csv` | every single Sens Finder test with its score breakdown |
 
 > Windows SmartScreen may warn you the first time, because the .exe is not signed.
 > Click **More info → Run anyway**.
@@ -140,7 +141,7 @@ cmake --build build --config Debug
 ```
 
 Debug builds run a self-test at startup that checks the sensitivity, cm/360,
-FOV, camera, PSA and crosshair-code math against known answers. The result is shown at
+FOV, camera, Sens Finder and crosshair-code math against known answers. The result is shown at
 the bottom of the main menu ("math self-test PASSED"). If anything fails, a
 message box lists the failing checks.
 
@@ -370,16 +371,20 @@ tendency. The results screen shows the old and new value with an **UNDO** button
 Copy the new value into Valorant to keep both games the same. Everything is appended to
 `stats.csv`. **Stats & Progress** shows per-mode graphs, personal bests and recent runs.
 
-**Sens Finder (PSA):**
+**Sens Finder:**
 
-1. It starts from your current sens and tests `×1.5` and `×0.5`.
-2. Each round has two blind 20-second tests (A/B, in random order): 7 s of flicks,
-   7 s of tracking and 6 s of micro-adjustments. After each test you rate its comfort from 1 to 5.
-3. Each test is scored from 0 to 100 as: 25% accuracy, 20% TTK, 15% click precision
-   (over/undershoot relative to target size), 25% tracking and 15% comfort.
-4. The weaker side moves to the midpoint, so the range halves toward the better side.
-   After 7 rounds the midpoint is your recommendation, shown with eDPI, cm/360 and a
-   graph of every tested sens against its score. Click **Apply** to use it.
+1. Every test is the same blind 20-second mix: 7 s of flicks, 7 s of tracking and 6 s of
+   micro-adjustments. The sens is hidden and nothing is asked afterwards.
+2. Test 1 is a warm-up at your current sens (not scored). Tests 2-8 scan 7 sensitivities from `×0.55`
+   to `×1.8` of your sens in random order. Tests 9-18 play 5 sensitivities from `×0.67` to `×1.5` of
+   the scan's best estimate, each twice, in random order.
+3. Each test is scored from 0 to 100 as: 30% accuracy, 25% TTK, 20% click precision (error relative to
+   target size) and 25% tracking.
+4. The recommendation is the peak of a curve (a locally weighted parabola of score against log sens)
+   fitted through all scored tests. It includes a term for getting better during the session, so
+   warming up doesn't favour whichever sens you happened to play last. It's shown with eDPI, cm/360,
+   a likely range and a graph of every test. Click **Apply** to use it. If you did best at the edge of
+   the range, apply it and run the finder again from there.
 5. Run it on different days. The combined recommendation averages all sessions in
    cm/360, so it stays correct even if you change DPI.
 
@@ -423,7 +428,7 @@ Copy the new value into Valorant to keep both games the same. Everything is appe
 | `src/modes_extra.cpp` | Headshot, Sixshot, Spidershot, Motionshot, Smooth Tracking, Strafe Tap, Target Switch, Long Range, Microflex, Popcorn |
 | `src/training.h`, `src/training.cpp` | Warmup routine and the Improve My Aim coach (skill diagnosis, adaptive plans) |
 | `src/movement.h`, `src/movement.cpp` | Valorant-style movement shared by VS Bot and Sniper (run, walk, crouch, jump, counter-strafe) |
-| `src/sens_finder.h`, `src/sens_finder.cpp` | PSA logic, scoring, session storage and averaging |
+| `src/sens_finder.h`, `src/sens_finder.cpp` | Sens Finder test plan, curve fit, scoring, session storage and averaging |
 | `src/stats.h`, `src/stats.cpp` | run statistics, coaching tips, `stats.csv` |
 | `src/rank.h`, `src/rank.cpp` | estimated aim rank (tier thresholds per mode), roasts |
 | `src/rank_badge.h`, `src/rank_badge.cpp` | vector emblems for the 9 tiers |

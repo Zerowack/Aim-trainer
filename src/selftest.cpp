@@ -112,22 +112,31 @@ bool RunSelfTest(std::string& report) {
     const Vector3 right = DirectionFromAngles(90.0, 0.0);
     c.True("yaw +90 looks toward +X (right)", std::fabs(right.x - 1.0f) < 1e-6f);
 
-    // --- PSA narrowing with a perfect "player" whose best sens is 0.33 -----
+    // --- Sens finder with a "player" whose performance peaks at 0.33 --------
     {
         SensFinder f;
         const double best = 0.33;
         f.Start(0.4, 800.0, 0x5Au);
+        int k = 0;
         while (!f.Finished()) {
             const double s = f.CurrentSens();
+            const double x = std::log(s / best);
             RunStats rs;
             rs.mode = ModeId::Mixed;
-            rs.shots = 100;
-            rs.hits = static_cast<int>(std::lround(100.0 - std::fabs(s - best) * 200.0));
-            f.Submit(rs, 3);
+            rs.shots = 1000;
+            // Peaked performance plus a learning trend and a little noise.
+            rs.hits = static_cast<int>(std::lround(850.0 - 900.0 * x * x + 3.0 * k + ((k * 37) % 7 - 3) * 2.0));
+            f.Submit(rs);
+            ++k;
         }
-        c.Near("PSA range width after 7 rounds", f.High() - f.Low(), 0.4 / 128.0, 1e-9);
-        c.Near("PSA converges near the best sens", f.Recommended(), best, 0.004);
-        c.True("PSA recorded 14 tests", f.Tests().size() == 14);
+        c.True("sens finder runs warm-up + scan + refine", static_cast<int>(f.Tests().size()) == SensFinder::kTotalTests);
+        c.True("sens finder finds a peak", f.Fit().peaked);
+        c.Near("sens finder converges near the best sens", f.Recommended(), best, 0.012);
+        bool refineAround = true;
+        for (const FinderTest& t : f.Tests()) {
+            if (t.phase == FinderPhase::Refine) refineAround = refineAround && std::fabs(std::log(t.sens / best)) < 0.5;  // x0.67-x1.5 of the estimate
+        }
+        c.True("sens finder refines around the best area", refineAround);
     }
 
     // --- Combined recommendation across DPIs --------------------------------

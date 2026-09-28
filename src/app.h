@@ -18,7 +18,7 @@
 #include "training.h"
 #include "world.h"
 
-constexpr const char* kAppVersion = "2.4.0";
+constexpr const char* kAppVersion = "2.5.0";
 
 // Game clock = real time minus all time spent paused.
 struct GameClock {
@@ -49,8 +49,6 @@ enum class Screen {
     Stats,
     FinderIntro,
     FinderReady,
-    FinderComfort,
-    FinderRound,
     FinderFinal,
     Rank,
     Difficulty,
@@ -105,8 +103,6 @@ private:
     void ScreenStats();
     void ScreenFinderIntro();
     void ScreenFinderReady();
-    void ScreenFinderComfort();
-    void ScreenFinderRound();
     void ScreenFinderFinal();
     void ScreenRank();
     void ScreenDifficulty();

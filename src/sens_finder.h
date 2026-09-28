@@ -1,12 +1,18 @@
-// sens_finder.h - Perfect Sensitivity Approximation (PSA) finder.
+// sens_finder.h - Performance-based sensitivity finder.
 //
-// PSA narrows a sensitivity range by repeated A/B comparison:
-//   start: low = sens x 0.5, high = sens x 1.5
-//   each round: play one test at 'low' and one at 'high' (random order,
-//   labelled A/B so you don't know which is which). The worse side is moved
-//   to the midpoint of the range, so the range halves toward the better side.
-//   After 7 rounds the range is 1/128 of the start width and its midpoint is
-//   the recommendation.
+// No questions, no feel ratings: the sens is picked from how you actually
+// perform. Every test is the same 20 second mix (flicks, tracking, micro-
+// adjustments) at a hidden sens:
+//   1. Warm-up: one test at your current sens (not counted).
+//   2. Scan: 7 sensitivities spread evenly (on a log scale) from x0.55 to
+//      x1.8 of your sens, in random order.
+//   3. Refine: 5 sensitivities from x0.67 to x1.5 of the scan's best
+//      estimate, each played twice, in random order.
+// The recommendation is the peak of a curve fitted through every scored
+// test (score vs log sens, a locally weighted parabola), with a term for
+// improving over the session so warming up doesn't bias it towards the
+// sens you played last. Tuned in simulation: with a clear performance
+// difference between sensitivities it lands within ~3-6% of the true best.
 #pragma once
 
 #include <string>
@@ -20,17 +26,18 @@ struct FinderScore {
     double speed = 0.0;      // from average time-to-kill
     double precision = 0.0;  // from click error relative to target size
     double tracking = 0.0;   // time on target %
-    double comfort = 0.0;    // from the 1-5 rating
     double total = 0.0;      // weighted, 0..100
 };
 
-FinderScore ScoreFinderTest(const RunStats& s, int comfort);
+FinderScore ScoreFinderTest(const RunStats& s);
+
+enum class FinderPhase { Warmup, Scan, Refine };
+const char* FinderPhaseName(FinderPhase p);
 
 struct FinderTest {
-    int round = 0;      // 1-based
-    char label = 'A';   // A or B (shown to the player)
+    int index = 0;  // 1-based, in play order
+    FinderPhase phase = FinderPhase::Scan;
     double sens = 0.0;
-    int comfort = 3;
     FinderScore score;
     double accuracyPct = 0.0;
     double avgTtkMs = -1.0;
@@ -47,33 +54,39 @@ struct FinderSession {
     double cm360 = 0.0;
 };
 
+// Result of the curve fit.
+struct FinderFit {
+    bool valid = false;       // enough tests to fit
+    bool peaked = false;      // the curve has a real maximum inside the tested range
+    double best = 0.0;        // recommended sens
+    double low = 0.0;         // likely range (about +-1 standard error)
+    double high = 0.0;
+    double a = 0.0, b = 0.0, c = 0.0;  // score = a + b x + c x^2, x = ln(sens / start), at the session's end
+};
+
 class SensFinder {
 public:
-    static constexpr int kRounds = 7;
+    static constexpr int kScanTests = 7;
+    static constexpr int kRefineSens = 5;
+    static constexpr int kRefineRepeats = 2;
+    static constexpr int kTotalTests = 1 + kScanTests + kRefineSens * kRefineRepeats;
     static constexpr double kTestSeconds = 20.0;
 
-    // Bit n of 'orderBits' decides whether round n tests the high sens first
-    // (pass random bits so the order is unpredictable).
-    void Start(double currentSens, double dpi, unsigned int orderBits);
+    void Start(double currentSens, double dpi, unsigned int seed);
     bool Active() const { return active_; }
     bool Finished() const { return finished_; }
 
-    int Round() const { return round_; }            // 1..kRounds
-    int TestInRound() const { return testInRound_; }  // 0 or 1
-    char CurrentLabel() const { return testInRound_ == 0 ? 'A' : 'B'; }
+    int TestNumber() const { return static_cast<int>(tests_.size()) + 1; }  // 1..kTotalTests
+    FinderPhase CurrentPhase() const;
     double CurrentSens() const;
-    double Low() const { return low_; }
-    double High() const { return high_; }
     double StartSens() const { return startSens_; }
     double Dpi() const { return dpi_; }
 
-    // Records the finished test. Returns true if this completed a round.
-    bool Submit(const RunStats& stats, int comfort);
-    // Result of the last completed round.
-    bool LastRoundHighWon() const { return lastHighWon_; }
-    const FinderTest* LastRoundTest(bool high) const;
+    // Records the finished test and moves on.
+    void Submit(const RunStats& stats);
 
-    double Recommended() const { return 0.5 * (low_ + high_); }
+    const FinderFit& Fit() const { return fit_; }
+    double Recommended() const { return fit_.valid ? fit_.best : startSens_; }
     const std::vector<FinderTest>& Tests() const { return tests_; }
 
     // Persists the finished session (sessions + per-test CSV files).
@@ -81,19 +94,18 @@ public:
     void Cancel() { active_ = false; }
 
 private:
-    bool IsHighFirst(int round) const { return ((orderBits_ >> round) & 1u) != 0; }
+    void Shuffle(std::vector<double>& v);
+    void PlanRefine();
+    FinderFit FitTests() const;
 
     bool active_ = false;
     bool finished_ = false;
     double startSens_ = 0.4;
     double dpi_ = 800.0;
-    double low_ = 0.2;
-    double high_ = 0.6;
-    int round_ = 1;
-    int testInRound_ = 0;
-    unsigned int orderBits_ = 0;
-    bool lastHighWon_ = false;
+    unsigned int rng_ = 1;
+    std::vector<double> plan_;  // sens of every test, in play order
     std::vector<FinderTest> tests_;
+    FinderFit fit_;
     std::string sessionId_;
     std::string timestamp_;
 };

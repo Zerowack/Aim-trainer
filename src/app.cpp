@@ -255,8 +255,6 @@ void App::Frame() {
         case Screen::Stats: ui::Backdrop(); ScreenStats(); break;
         case Screen::FinderIntro: ui::Backdrop(); ScreenFinderIntro(); break;
         case Screen::FinderReady: ui::Backdrop(); ScreenFinderReady(); break;
-        case Screen::FinderComfort: ui::Backdrop(); ScreenFinderComfort(); break;
-        case Screen::FinderRound: ui::Backdrop(); ScreenFinderRound(); break;
         case Screen::FinderFinal: ui::Backdrop(); ScreenFinderFinal(); break;
         case Screen::Rank: ui::Backdrop(); ScreenRank(); break;
         case Screen::Difficulty: ui::Backdrop(); ScreenDifficulty(); break;
@@ -384,8 +382,11 @@ void App::EndRun() {
     live_ = false;
 
     if (finderRun_) {
+        // Scored automatically: no questions, straight to the next test.
         finderLastStats_ = s;
-        screen_ = Screen::FinderComfort;
+        finder_.Submit(s);
+        finderRun_ = false;
+        screen_ = finder_.Finished() ? Screen::FinderFinal : Screen::FinderReady;
         return;
     }
 
@@ -694,7 +695,7 @@ void App::DrawHud(double g) {
             const float size = 110.0f * (1.0f + 0.3f * f * f);
             TextBold(TextFormat("%d", c), cx, cy - 150.0f - (size - 110.0f) * 0.5f, size, Alpha(theme::kAccent, 0.55f + 0.45f * (1.0f - f)),
                      Align::Center);
-            Text(finderRun_ ? TextFormat("TEST %c - GET READY", finder_.CurrentLabel()) : "GET READY", cx, cy + 60.0f, 24.0f,
+            Text(finderRun_ ? TextFormat("TEST %d / %d - GET READY", finder_.TestNumber(), SensFinder::kTotalTests) : "GET READY", cx, cy + 60.0f, 24.0f,
                  theme::kText, Align::Center);
         }
     }
@@ -707,7 +708,7 @@ void App::DrawHud(double g) {
         std::string info = TextFormat("HFOV %.1f  VFOV %.1f  |  %dx%d", val::HorizontalFovFromVertical(vfov, aspect), vfov,
                                       GetScreenWidth(), GetScreenHeight());
         if (finderRun_) {
-            info += "  |  SENS HIDDEN (A/B TEST)";
+            info += "  |  SENS HIDDEN (SENS FINDER)";
         } else if (zoom > 1.0) {
             const double eff = val::ScopedSens(sens, cfg_.scopedMult, zoom);
             info += TextFormat("  |  SCOPED %.1fx  x%.2f  |  effective sens %.4f  |  %.1f cm/360", zoom, cfg_.scopedMult, eff,
