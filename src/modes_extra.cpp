@@ -159,7 +159,7 @@ private:
     void Spawn() {
         Target tg;
         tg.kind = TargetKind::Sphere;
-        tg.radius = 0.28f * ctx_.diff.size;
+        tg.radius = 0.26f * ctx_.diff.size;
         if (centreNext_) {
             tg.pos = PointFromAngles(0.0, 0.0, 10.0);
         } else {
@@ -252,7 +252,7 @@ public:
         for (double& p : phase_) p = ctx_.rng->Uniform(0.0, 6.2831853);
         Target tg;
         tg.kind = TargetKind::Sphere;
-        tg.radius = 0.35f * ctx_.diff.size;
+        tg.radius = 0.26f * ctx_.diff.size;
         tg.pos = Vector3{0.0f, 1.6f, -12.0f};
         targets_.push_back(tg);
     }
@@ -261,7 +261,7 @@ public:
         TickTargets(dt);
         if (targets_.empty()) return;
         // Sum of sines at unrelated frequencies = smooth, never repeating path.
-        const double k = static_cast<double>(ctx_.diff.speed);
+        const double k = 1.15 * static_cast<double>(ctx_.diff.speed);
         const double s = (t - start_) * k;
         Target& tg = targets_[0];
         tg.pos.x = static_cast<float>(3.4 * std::sin(0.83 * s + phase_[0]) + 1.3 * std::sin(2.17 * s + phase_[1]));
@@ -596,9 +596,10 @@ public:
             }
             ++i;
         }
-        if (targets_.size() < 2 && t >= nextAt_) {
+        // Up to three in the air; a fast player is never left waiting for targets.
+        if (targets_.size() < 3 && t >= nextAt_) {
             Launch();
-            nextAt_ = t + ctx_.rng->Uniform(0.5, 0.9) / static_cast<double>(k);
+            nextAt_ = t + ctx_.rng->Uniform(0.18, 0.32) / static_cast<double>(k);
         }
     }
 

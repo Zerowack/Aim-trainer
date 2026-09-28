@@ -341,9 +341,16 @@ rank on the main menu averages all modes you've played (at least 3 are needed). 
 estimates **aim only**: real rank also depends on game sense, utility and teamwork, and the
 tier cut-offs are calibrated estimates, not official Riot data.
 
-The cut-offs are strict (v2.0 raised them about 20–30%). Gold in Gridshot needs 3.8 kills/s at 100%
-accuracy (228 hits in 60 s), and Radiant needs 7.2. Tracking multiplies time on target by how much
-of your firing was on target, so holding the trigger the whole run doesn't pay.
+**How the cut-offs were set:** a simulated player with the aim of a typical player at the start of
+each Valorant tier played every mode in the real game code. Each tier has its own reaction time,
+flick speed and precision (Fitts' law), and delay and hand drift while tracking. The values it
+reached are the cut-offs, so one skill level gives the same rank in every mode, and Gold 3 here
+means Gold 3 aim. Examples: Gold in Gridshot starts at 2.55 kills/s at 100% accuracy (153 hits in
+60 s), Diamond at 3.2 and Radiant at 4.65. Reaction: Gold 250 ms, Radiant 198 ms. Tracking a
+strafing agent is capped by how fast humans react to direction changes: Radiant starts at about
+45% time on target. Tracking multiplies time on target by how much of your firing was on target,
+so holding the trigger the whole run doesn't pay. This is still an estimate: there is no public
+data that maps these exact scenarios to Valorant ranks.
 
 **Scoring:** a miss costs half a kill (−50) in the click modes, so spam-clicking never beats clean
 shots. Tracking gives +100 per second on target while firing and −60 per second firing off target.

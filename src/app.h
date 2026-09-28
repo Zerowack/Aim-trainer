@@ -18,7 +18,7 @@
 #include "training.h"
 #include "world.h"
 
-constexpr const char* kAppVersion = "2.3.0";
+constexpr const char* kAppVersion = "2.3.1";
 
 // Game clock = real time minus all time spent paused.
 struct GameClock {

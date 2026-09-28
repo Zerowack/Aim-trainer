@@ -173,15 +173,15 @@ bool RunSelfTest(std::string& report) {
         RunRecord g;
         g.mode = ModeId::Gridshot;
         g.duration = 60.0;
-        g.hits = 228;  // 3.8 kills/s at 100% = exactly Gold's start
+        g.hits = 153;  // 2.55 kills/s at 100% = exactly Gold's start
         g.accuracy = 100.0;
         AimRank r;
-        c.True("rank: gridshot 3.8 kills/s = Gold 1", RankFromRecord(g, r) && RankLabel(r) == "Gold 1");
+        c.True("rank: gridshot 2.55 kills/s = Gold 1", RankFromRecord(g, r) && RankLabel(r) == "Gold 1");
         g.accuracy = 50.0;  // same kills at half the accuracy = half the value
         c.True("rank: accuracy matters (50% acc drops to Iron)", RankFromRecord(g, r) && r.tier == 0);
-        g.hits = 176;  // the reported run: 176 hits, 91.2% -> 2.68 = Bronze 1
+        g.hits = 176;  // 176 hits, 91.2% -> 2.68 = Gold 2
         g.accuracy = 91.2;
-        c.True("rank: 176 hits @ 91% in 60 s = Bronze 1", RankFromRecord(g, r) && RankLabel(r) == "Bronze 1");
+        c.True("rank: 176 hits @ 91% in 60 s = Gold 2", RankFromRecord(g, r) && RankLabel(r) == "Gold 2");
         RunRecord rx;
         rx.mode = ModeId::Reaction;
         rx.duration = 60.0;
@@ -192,12 +192,12 @@ bool RunSelfTest(std::string& report) {
         c.True("rank: reaction 190 ms = Radiant", RankFromRecord(rx, r) && RankLabel(r) == "Radiant");
         rx.avgReactionMs = 420.0;
         c.True("rank: reaction 420 ms = Iron", RankFromRecord(rx, r) && r.tier == 0);
-        RunRecord hard = g;  // Bronze 1 value at Normal...
-        hard.difficulty = Difficulty::Hard;  // ...x1.25 on Hard: 2.68 * 1.25 = 3.34 -> Silver 1
-        c.True("rank: Hard difficulty is worth more (Bronze 1 -> Silver 1)", RankFromRecord(hard, r) && RankLabel(r) == "Silver 1");
+        RunRecord hard = g;  // Gold 2 value at Normal...
+        hard.difficulty = Difficulty::Hard;  // ...x1.25 on Hard: 2.68 * 1.25 = 3.34 -> Diamond 2
+        c.True("rank: Hard difficulty is worth more (Gold 2 -> Diamond 2)", RankFromRecord(hard, r) && RankLabel(r) == "Diamond 2");
         RunRecord easy = g;
-        easy.difficulty = Difficulty::Easy;  // x0.75 -> 2.01 = Iron 1
-        c.True("rank: Easy difficulty is worth less (Bronze 1 -> Iron 1)", RankFromRecord(easy, r) && RankLabel(r) == "Iron 1");
+        easy.difficulty = Difficulty::Easy;  // x0.75 -> 2.01 = Bronze 1
+        c.True("rank: Easy difficulty is worth less (Gold 2 -> Bronze 1)", RankFromRecord(easy, r) && RankLabel(r) == "Bronze 1");
         RunRecord pl;
         pl.mode = ModeId::Placement;
         pl.duration = 60.0;

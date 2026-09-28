@@ -8,8 +8,17 @@
 namespace {
 
 // Start value of each tier (Iron, Bronze, Silver, Gold, Platinum, Diamond,
-// Ascendant, Immortal, Radiant) for each ranked mode. Calibrated estimates
-// for this trainer's target sizes and distances.
+// Ascendant, Immortal, Radiant) for each ranked mode.
+//
+// Calibration (v2.3.1): a simulated player with the motor skill of a typical
+// player at the start of each Valorant tier (reaction time, Fitts' law flick
+// speed, endpoint scatter, visual-motor delay while tracking, hand drift)
+// played every mode in the real game code, and the values it reached became
+// the cut-offs. So one skill level gives the same rank in every mode, and a
+// rank here means that tier's aim, not just a good score. Tracking a strafing
+// target is capped by human reaction to direction changes, so its numbers
+// are low. Strafe Tap, Target Switch and Peek depend on strategy the model
+// only partly captures; their cut-offs are smoothed from its kill rates.
 struct Thresholds {
     double start[kTierCount];
     bool lowerIsBetter;
@@ -18,32 +27,32 @@ struct Thresholds {
 bool ThresholdsFor(ModeId m, Thresholds& t) {
     switch (m) {
         // Gridshot: kills per second x accuracy.
-        case ModeId::Gridshot: t = {{2.0, 2.6, 3.2, 3.8, 4.4, 5.0, 5.6, 6.3, 7.2}, false}; return true;
+        case ModeId::Gridshot: t = {{1.65, 1.95, 2.25, 2.55, 2.85, 3.20, 3.55, 3.95, 4.65}, false}; return true;
         // Microshot: head-size kills per second x accuracy.
-        case ModeId::Microshot: t = {{0.60, 0.80, 1.00, 1.20, 1.40, 1.60, 1.80, 2.00, 2.30}, false}; return true;
+        case ModeId::Microshot: t = {{0.59, 0.65, 0.73, 0.80, 0.88, 1.05, 1.22, 1.48, 1.95}, false}; return true;
         // Tracking: time on target (percent) x firing discipline.
-        case ModeId::Tracking: t = {{36.0, 44.0, 51.0, 58.0, 64.0, 70.0, 76.0, 82.0, 88.0}, false}; return true;
+        case ModeId::Tracking: t = {{10.0, 14.0, 18.0, 22.0, 25.0, 28.0, 31.0, 34.0, 37.0}, false}; return true;
         // Flick 180: kills per second x accuracy.
-        case ModeId::Flick180: t = {{0.45, 0.60, 0.75, 0.90, 1.05, 1.20, 1.35, 1.50, 1.70}, false}; return true;
+        case ModeId::Flick180: t = {{0.52, 0.63, 0.72, 0.81, 0.94, 1.06, 1.19, 1.31, 1.50}, false}; return true;
         // Reaction: average ms (includes your monitor/system latency).
-        case ModeId::Reaction: t = {{300.0, 280.0, 262.0, 248.0, 236.0, 225.0, 215.0, 205.0, 192.0}, true}; return true;
+        case ModeId::Reaction: t = {{290.0, 272.0, 260.0, 250.0, 241.0, 232.0, 222.0, 212.0, 198.0}, true}; return true;
         // Peek: peeks killed per second x accuracy (the peek rate caps this near 0.58).
-        case ModeId::Peek: t = {{0.20, 0.26, 0.31, 0.36, 0.40, 0.44, 0.48, 0.51, 0.55}, false}; return true;
+        case ModeId::Peek: t = {{0.02, 0.05, 0.08, 0.13, 0.19, 0.26, 0.32, 0.38, 0.45}, false}; return true;
         // Sniper: share of peeks killed (deaths count against you) x accuracy
         // x speed (time to kill after the enemy showed up). Per peek, so every
         // rifle has the same ceiling.
         case ModeId::Sniper: t = {{0.08, 0.15, 0.23, 0.31, 0.40, 0.49, 0.58, 0.67, 0.78}, false}; return true;
         // Classic scenarios: kills per second x accuracy (tracking: time on target).
-        case ModeId::Headshot: t = {{0.50, 0.68, 0.86, 1.04, 1.22, 1.40, 1.58, 1.76, 2.00}, false}; return true;
-        case ModeId::Sixshot: t = {{1.60, 2.10, 2.60, 3.10, 3.60, 4.10, 4.60, 5.10, 5.80}, false}; return true;
-        case ModeId::Spidershot: t = {{0.90, 1.20, 1.50, 1.80, 2.10, 2.40, 2.70, 3.00, 3.40}, false}; return true;
-        case ModeId::Motionshot: t = {{0.80, 1.10, 1.40, 1.70, 2.00, 2.30, 2.60, 2.90, 3.30}, false}; return true;
-        case ModeId::SmoothTrack: t = {{40.0, 48.0, 55.0, 62.0, 68.0, 74.0, 79.0, 84.0, 89.0}, false}; return true;
-        case ModeId::StrafeTap: t = {{0.35, 0.50, 0.65, 0.80, 0.95, 1.10, 1.25, 1.40, 1.60}, false}; return true;
-        case ModeId::TargetSwitch: t = {{0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95, 1.05, 1.18}, false}; return true;
-        case ModeId::LongRange: t = {{0.35, 0.50, 0.65, 0.80, 0.95, 1.10, 1.25, 1.40, 1.60}, false}; return true;
-        case ModeId::Microflex: t = {{0.80, 1.05, 1.30, 1.55, 1.80, 2.05, 2.30, 2.55, 2.90}, false}; return true;
-        case ModeId::Popcorn: t = {{0.60, 0.80, 1.00, 1.20, 1.40, 1.60, 1.80, 2.00, 2.30}, false}; return true;
+        case ModeId::Headshot: t = {{0.58, 0.70, 0.82, 0.93, 1.03, 1.15, 1.28, 1.39, 1.57}, false}; return true;
+        case ModeId::Sixshot: t = {{1.20, 1.50, 1.80, 2.05, 2.30, 2.75, 3.25, 3.85, 4.55}, false}; return true;
+        case ModeId::Spidershot: t = {{0.91, 1.02, 1.16, 1.28, 1.41, 1.60, 1.77, 2.05, 2.45}, false}; return true;
+        case ModeId::Motionshot: t = {{1.10, 1.28, 1.45, 1.67, 1.85, 2.13, 2.43, 2.77, 3.40}, false}; return true;
+        case ModeId::SmoothTrack: t = {{15.0, 22.0, 30.0, 41.0, 51.0, 62.0, 75.0, 88.0, 97.0}, false}; return true;
+        case ModeId::StrafeTap: t = {{0.10, 0.13, 0.17, 0.22, 0.28, 0.36, 0.46, 0.60, 0.80}, false}; return true;
+        case ModeId::TargetSwitch: t = {{0.09, 0.12, 0.15, 0.19, 0.23, 0.27, 0.31, 0.36, 0.42}, false}; return true;
+        case ModeId::LongRange: t = {{0.63, 0.73, 0.85, 0.96, 1.08, 1.21, 1.34, 1.47, 1.70}, false}; return true;
+        case ModeId::Microflex: t = {{1.07, 1.19, 1.29, 1.37, 1.45, 1.54, 1.63, 1.71, 1.82}, false}; return true;
+        case ModeId::Popcorn: t = {{0.30, 0.62, 0.95, 1.18, 1.40, 1.75, 2.10, 2.45, 2.80}, false}; return true;
         // Crosshair Placement: average angle to the head when agents appear (deg).
         case ModeId::Placement: t = {{12.0, 9.5, 7.5, 5.8, 4.5, 3.5, 2.6, 1.9, 1.2}, true}; return true;
         default: return false;
